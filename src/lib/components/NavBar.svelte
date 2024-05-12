@@ -10,7 +10,7 @@
 <nav class="absolute bottom-0 left-0 right-0 flex flex-row border-t-[1px] border-gray-modern-200">
 	<button
 		on:click={() => {
-			goto('/');
+			goto('/transfers');
 		}}
 		class="flex h-20 flex-1 flex-col items-center justify-center"
 	>

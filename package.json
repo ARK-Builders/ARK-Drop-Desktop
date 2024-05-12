@@ -19,6 +19,7 @@
 		"@sveltejs/vite-plugin-svelte": "^3.0.0",
 		"@tauri-apps/cli": "^1.5.13",
 		"@types/eslint": "^8.56.0",
+		"@types/qrcode": "^1.5.5",
 		"@typescript-eslint/eslint-plugin": "^7.0.0",
 		"@typescript-eslint/parser": "^7.0.0",
 		"autoprefixer": "^10.4.19",
@@ -38,6 +39,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@tauri-apps/api": "^1.5.5"
+		"@tauri-apps/api": "^1.5.5",
+		"qrcode": "^1.5.3"
 	}
 }

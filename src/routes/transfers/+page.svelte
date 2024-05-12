@@ -1,10 +1,26 @@
-<script>
+<script lang="ts">
+	import { open } from '@tauri-apps/api/dialog';
+
 	import NavBar from '$lib/components/NavBar.svelte';
 	import ArrowCircleBrokenDown from '$lib/components/icons/ArrowCircleBrokenDown.svelte';
 	import ArrowCircleBrokenUp from '$lib/components/icons/ArrowCircleBrokenUp.svelte';
-	import ClockRewind from '$lib/components/icons/ClockRewind.svelte';
-	import SwitchVertical02 from '$lib/components/icons/SwitchVertical02.svelte';
-	import User03 from '$lib/components/icons/User03.svelte';
+	import { goto } from '$app/navigation';
+
+	const getSelectedFiles = async () => {
+		const selected = await open({
+			multiple: true
+		});
+
+		if (selected === null) {
+			return [];
+		}
+
+		if (Array.isArray(selected)) {
+			return selected;
+		}
+
+		return [selected];
+	};
 </script>
 
 <header
@@ -29,6 +45,16 @@
 	</div>
 	<div class="flex flex-row justify-center gap-[1.125rem] p-4">
 		<button
+			on:click={async () => {
+				const files = await getSelectedFiles();
+				if (files) {
+					goto(`/transfers/send`, {
+						state: {
+							files
+						}
+					});
+				}
+			}}
 			class="flex w-32 flex-row items-center justify-center gap-2 rounded-lg bg-blue-dark-500 px-[1.125rem] py-3"
 		>
 			<ArrowCircleBrokenUp class="h-5 w-5 stroke-primary-fg" /><span
