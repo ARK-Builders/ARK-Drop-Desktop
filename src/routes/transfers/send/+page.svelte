@@ -24,7 +24,12 @@
 		<ChevronLeft class="h-6 w-6 stroke-black" />
 		<span class="text-lg font-medium">Back</span>
 	</button>
-	<button class="flex flex-row items-center gap-2">
+	<button
+		on:click={() => {
+			goto('/transfers/recieve');
+		}}
+		class="flex flex-row items-center gap-2"
+	>
 		<Scan class="h-6 w-6 stroke-blue-dark-500" />
 		<span class="text-lg font-medium text-blue-dark-500">Scan</span>
 	</button>

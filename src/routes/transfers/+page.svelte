@@ -47,7 +47,7 @@
 		<button
 			on:click={async () => {
 				const files = await getSelectedFiles();
-				if (files) {
+				if (files.length > 0) {
 					goto(`/transfers/send`, {
 						state: {
 							files
@@ -62,6 +62,9 @@
 			></button
 		>
 		<button
+			on:click={() => {
+				goto(`/transfers/recieve`);
+			}}
 			class="flex w-32 flex-row items-center justify-center gap-2 rounded-lg bg-blue-dark-500 px-[1.125rem] py-3"
 		>
 			<ArrowCircleBrokenDown class="h-5 w-5 stroke-primary-fg" /><span
