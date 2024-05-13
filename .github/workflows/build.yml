@@ -63,3 +63,31 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.settings.args }}
+
+      - name: Upload Windows Build
+        uses: actions/upload-artifact@v4
+        if: matrix.settings.platform == 'windows-latest'
+        with:
+          name: ark-gallery-Windows.zip
+          path: ./src-tauri/target/release/bundle/
+
+      - name: Upload Linux AppImage
+        if: matrix.settings.platform == 'ubuntu-22.04'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ark-gallery.AppImage
+          path: ./src-tauri/target/release/bundle/appimage/ark-gallery_*_amd64.AppImage
+
+      - name: Upload MacOS Build (ark-drop.app)
+        uses: actions/upload-artifact@v4
+        if: matrix.settings.platform == 'macos-latest'
+        with:
+          name: ark-gallery-MacOS.zip
+          path: ./src-tauri/target/release/bundle/macos/
+
+      - name: Upload MacOS Build (ark-drop.dmg)
+        uses: actions/upload-artifact@v4
+        if: matrix.settings.platform == 'macos-latest'
+        with:
+          name: ark-gallery-MacOS.zip
+          path: ./src-tauri/target/release/bundle/dmg/
