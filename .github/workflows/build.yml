@@ -87,5 +87,5 @@ jobs:
         uses: actions/upload-artifact@v4
         if: matrix.settings.platform == 'macos-latest'
         with:
-          name: ark-drop-MacOS.zip
+          name: ark-drop-MacOS-dmg.zip
           path: ./src-tauri/target/universal-apple-darwin/release/bundle/dmg
