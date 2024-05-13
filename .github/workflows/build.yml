@@ -56,6 +56,8 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          releaseId: app-v__VERSION__
+          relaeseName: app-v__VERSION__
           tagName: app-v__VERSION__
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: true
