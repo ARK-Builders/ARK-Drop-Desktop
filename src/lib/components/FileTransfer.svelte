@@ -2,7 +2,7 @@
 	import FileType from './icons/FileType.svelte';
 	import XClose from './icons/XClose.svelte';
 	import CheckCircle from './icons/CheckCircle.svelte';
-	import { onMount } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
 	import Button from './Button.svelte';
 	import { formatBytes, formatTime } from '$lib/util';
 
@@ -17,11 +17,18 @@
 		return Math.floor((done / all) * 100);
 	}
 
+	const dispatch = createEventDispatcher();
+
 	onMount(() => {
 		const updateSpeed = 10;
 		const interval = setInterval(() => {
 			transferedSize += internetSpeed / updateSpeed;
 			timeLeft = (fileSize - transferedSize) / internetSpeed;
+
+			if (transferedSize >= fileSize) {
+				clearInterval(interval);
+				dispatch('done');
+			}
 		}, 1000 / updateSpeed);
 		return () => clearInterval(interval);
 	});
@@ -29,9 +36,9 @@
 	let openModal = false;
 </script>
 
-<div class="border-1 flex w-full flex-col gap-3 rounded-2xl p-3">
+<div class="flex w-full flex-col gap-3 rounded-2xl border-1 p-3">
 	<div class="flex flex-row items-center gap-3">
-		<div class="border- border-1 h-11 w-11 rounded-full p-[10px]">
+		<div class="border- h-11 w-11 rounded-full border-1 p-[10px]">
 			<FileType />
 		</div>
 		<div class="flex flex-1 flex-col justify-between py-1">
@@ -69,7 +76,7 @@
 		{/if}
 	</div>
 	{#if transferedSize < fileSize}
-		<div class="bg-gray-modern-300 relative h-[6px] w-full rounded-full">
+		<div class="relative h-[6px] w-full rounded-full bg-gray-modern-300">
 			<div
 				style={`--percent-complete: ${100 - percentComplete(transferedSize, fileSize)}%`}
 				class={`absolute left-0 right-[var(--percent-complete)] h-full rounded-full bg-blue-dark-500`}
@@ -91,7 +98,7 @@
 				>
 			</div>
 			<div class="flex flex-row gap-2">
-				<div class="border- border-1 h-11 w-11 rounded-full p-[10px]">
+				<div class="border- h-11 w-11 rounded-full border-1 p-[10px]">
 					<FileType />
 				</div>
 				<div class="flex flex-1 flex-col justify-between py-1">
@@ -110,7 +117,13 @@
 					size="sm"
 					variant="secondary">Cancel</Button
 				>
-				<Button on:click={() => {}} size="sm" variant="primary">Remove</Button>
+				<Button
+					on:click={() => {
+						dispatch('cancel');
+					}}
+					size="sm"
+					variant="primary">Remove</Button
+				>
 			</div>
 		</div>
 	</div>

@@ -9,7 +9,11 @@ export default {
 			colors: {
 				'button-secondary-border': '#D0D5DD',
 				'button-secondary-fg': '#344054',
+				'nav-item-icon-fg': '#667085',
 				'primary-fg': '#fff',
+				'text-secondary': {
+					700: '#344054'
+				},
 				'gray-modern': {
 					100: '#EEF2F6',
 					200: '#E3E8EF',
@@ -19,6 +23,7 @@ export default {
 					900: '#121926'
 				},
 				'blue-dark': {
+					400: '#528BFF',
 					500: '#2970FF',
 					600: '#155EEF'
 				},
@@ -27,6 +32,9 @@ export default {
 				},
 				error: {
 					500: '#F04438'
+				},
+				success: {
+					500: '#17B26A'
 				}
 			},
 			borderWidth: {

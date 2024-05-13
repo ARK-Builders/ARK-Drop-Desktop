@@ -11,5 +11,7 @@
 		stroke-width="2"
 		stroke-linecap="round"
 		stroke-linejoin="round"
+		fill-rule="evenodd"
+		clip-rule="evenodd"
 	/>
 </svg>
