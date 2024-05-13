@@ -56,26 +56,8 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tagName: app-v__VERSION__
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.settings.args }}
-
-      - name: Upload Windows Build
-        uses: actions/upload-artifact@v4
-        if: matrix.settings.platform == 'windows-latest'
-        with:
-          name: ark-gallery.zip
-          path: ./src-tauri/target/release/bundle/
-      - name: Upload Linux AppImage
-        if: matrix.settings.platform == 'ubuntu-22.04'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ark-gallery.AppImage
-          path: ./src-tauri/target/release/bundle/appimage/ark-gallery_*_amd64.AppImage
-      - name: Upload MacOS App
-        if: matrix.settings.platform == 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ark-gallery.app
-          path: ./src-tauri/target/release/bundle/macos/
