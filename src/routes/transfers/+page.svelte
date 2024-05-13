@@ -5,6 +5,7 @@
 	import ArrowCircleBrokenDown from '$lib/components/icons/ArrowCircleBrokenDown.svelte';
 	import ArrowCircleBrokenUp from '$lib/components/icons/ArrowCircleBrokenUp.svelte';
 	import { goto } from '$app/navigation';
+	import Button from '$lib/components/Button.svelte';
 
 	const getSelectedFiles = async () => {
 		const selected = await open({
@@ -24,7 +25,7 @@
 </script>
 
 <header
-	class="flex flex-row items-center justify-between border-b-[1px] border-gray-modern-200 px-4 py-5"
+	class="border-b-1 flex flex-row items-center justify-between border-gray-modern-200 px-4 py-5"
 >
 	<div class="text-gray-modern-900">
 		<h3 class="text-sm">Hi Alice,</h3>
@@ -44,7 +45,7 @@
 		</div>
 	</div>
 	<div class="flex flex-row justify-center gap-[1.125rem] p-4">
-		<button
+		<Button
 			on:click={async () => {
 				const files = await getSelectedFiles();
 				if (files.length > 0) {
@@ -55,21 +56,21 @@
 					});
 				}
 			}}
-			class="flex w-32 flex-row items-center justify-center gap-2 rounded-lg bg-blue-dark-500 px-[1.125rem] py-3"
+			class="w-32"
 		>
 			<ArrowCircleBrokenUp class="h-5 w-5 stroke-primary-fg" /><span
 				class="text-[16px] font-semibold text-primary-fg">Send</span
-			></button
+			></Button
 		>
-		<button
+		<Button
 			on:click={() => {
 				goto(`/transfers/recieve`);
 			}}
-			class="flex w-32 flex-row items-center justify-center gap-2 rounded-lg bg-blue-dark-500 px-[1.125rem] py-3"
+			class="w-32"
 		>
 			<ArrowCircleBrokenDown class="h-5 w-5 stroke-primary-fg" /><span
 				class="text-[16px] font-semibold text-primary-fg">Recieve</span
-			></button
+			></Button
 		>
 	</div>
 </div>

@@ -14,10 +14,10 @@
 			showTooltip = false;
 		}, 1000);
 	}}
-	class="flex flex-row items-center gap-1 rounded-lg border-[1px] border-gray-modern-200 px-3 py-2"
+	class="border-1 flex flex-row items-center gap-1 rounded-lg border-gray-modern-200 px-3 py-2"
 >
-	<Link03 class="stroke-gray-modern-600 h-4 w-4" />
-	<span class="text-gray-modern-600 text-xs">Hash Code :</span>
+	<Link03 class="h-4 w-4 stroke-gray-modern-600" />
+	<span class="text-xs text-gray-modern-600">Hash Code :</span>
 	<span class=" text-xs font-bold text-gray-modern-900">{hashCode}</span>
 </button>
 
