@@ -9,7 +9,7 @@
 
 	export let selectedAvatar = 'avatar2';
 
-	let openAvatars = true;
+	let openAvatars = false;
 
 	let avatars = [
 		'avatar',
@@ -62,7 +62,12 @@
 
 {#if openAvatars}
 	<div transition:fade={{ duration: 100 }} class="fixed left-0 top-0 h-screen w-screen">
-		<div class="absolute inset-0 bg-black opacity-30"></div>
+		<button
+			on:click={() => {
+				openAvatars = false;
+			}}
+			class="absolute inset-0 bg-black opacity-30"
+		></button>
 		<div
 			transition:fly={{ duration: 300, x: 0, y: 500, opacity: 0.5, easing: quintOut }}
 			class="absolute bottom-0 flex w-full flex-col gap-4 rounded-t-2xl bg-white p-4"
