@@ -5,6 +5,7 @@
 	import { createEventDispatcher, onMount } from 'svelte';
 	import Button from './Button.svelte';
 	import { formatBytes, formatTime } from '$lib/util';
+	import FileUploaded from './FileUploaded.svelte';
 
 	let file = 'Img 2718. JPG';
 	let transferedSize = 1_500_000; // bytes
@@ -36,15 +37,15 @@
 	let openModal = false;
 </script>
 
-<div class="flex w-full flex-col gap-3 rounded-2xl border-1 p-3">
-	<div class="flex flex-row items-center gap-3">
-		<div class="border- h-11 w-11 rounded-full border-1 p-[10px]">
-			<FileType />
-		</div>
-		<div class="flex flex-1 flex-col justify-between py-1">
-			<span class="text-sm font-medium text-gray-modern-900">{file}</span>
-			<p class="flex flex-row items-center gap-1 text-xs text-gray-modern-500">
-				{#if transferedSize < fileSize}
+{#if transferedSize < fileSize}
+	<div class="flex w-full flex-col gap-3 rounded-2xl border-1 p-3">
+		<div class="flex flex-row items-center gap-3">
+			<div class="h-11 w-11 rounded-full border-1 p-[10px]">
+				<FileType />
+			</div>
+			<div class="flex flex-1 flex-col justify-between py-1">
+				<span class="text-sm font-medium text-gray-modern-900">{file}</span>
+				<p class="flex flex-row items-center gap-1 text-xs text-gray-modern-500">
 					{formatBytes(transferedSize)} of {formatBytes(fileSize)}
 					<svg
 						class="fill-gray-modern-500"
@@ -57,12 +58,8 @@
 						<circle cx="2" cy="2" r="2" />
 					</svg>
 					{formatTime(timeLeft)} left
-				{:else}
-					{formatBytes(fileSize)}
-				{/if}
-			</p>
-		</div>
-		{#if transferedSize < fileSize}
+				</p>
+			</div>
 			<button
 				on:click={() => {
 					openModal = true;
@@ -71,19 +68,27 @@
 			>
 				<XClose class="stroke-blue-dark-500" />
 			</button>
-		{:else}
-			<CheckCircle class="h-6 w-6 stroke-blue-dark-500" />
+		</div>
+
+		{#if transferedSize < fileSize}
+			<div class="relative h-[6px] w-full rounded-full bg-gray-modern-300">
+				<div
+					style={`--percent-complete: ${100 - percentComplete(transferedSize, fileSize)}%`}
+					class={`absolute left-0 right-[var(--percent-complete)] h-full rounded-full bg-blue-dark-500`}
+				></div>
+			</div>
 		{/if}
 	</div>
-	{#if transferedSize < fileSize}
-		<div class="relative h-[6px] w-full rounded-full bg-gray-modern-300">
-			<div
-				style={`--percent-complete: ${100 - percentComplete(transferedSize, fileSize)}%`}
-				class={`absolute left-0 right-[var(--percent-complete)] h-full rounded-full bg-blue-dark-500`}
-			></div>
-		</div>
-	{/if}
-</div>
+{:else}
+	<FileUploaded
+		fileUploaded={{
+			fileName: file,
+			fileSize: fileSize,
+			recipient: 'Aurora',
+			sentAt: new Date()
+		}}
+	/>
+{/if}
 
 {#if openModal}
 	<div class="fixed left-0 top-0 h-screen w-screen">

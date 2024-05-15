@@ -25,3 +25,34 @@ export function formatTime(seconds: number): string {
 
 	return `${Math.ceil(seconds)} secs`;
 }
+
+export function getDateInterval(date: Date) {
+	const now = new Date();
+
+	const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+	const inputDateNormalized = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+	const diffTime = nowDate.getUTCDate() - inputDateNormalized.getUTCDate();
+
+	if (diffTime === 0) {
+		return 'Today';
+	} else if (diffTime === 1) {
+		return 'Yesterday';
+	} else {
+		const startOfWeek = new Date(nowDate);
+		startOfWeek.setDate(nowDate.getDate() - nowDate.getDay());
+
+		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+		const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+		if (inputDateNormalized >= startOfWeek) {
+			return 'This Week';
+		} else if (inputDateNormalized >= startOfMonth) {
+			return 'This Month';
+		} else if (inputDateNormalized >= startOfYear) {
+			return 'This Year';
+		} else {
+			return 'Older';
+		}
+	}
+}
