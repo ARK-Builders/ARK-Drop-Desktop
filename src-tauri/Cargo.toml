@@ -17,7 +17,23 @@ tauri-build = { version = "1.5.2", features = [] }
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.6.4", features = ["dialog-open"] }
+tauri = { version = "1.6.7", features = ["dialog-open"] }
+iroh = "0.17.0"
+iroh-blobs = "0.17.0"
+rand = "0.8.5"
+anyhow = "1.0.86"
+hex = "0.4.3"
+iroh-base = "0.17.0"
+iroh-net = "0.17.0"
+tokio = { version = "1.37.0", features = ["full"] }
+tokio-util = "0.7.11"
+walkdir = "2.5.0"
+flume = "0.11.0"
+num_cpus = "1.16.0"
+futures-lite = "2.3.0"
+futures-buffered = "0.2.6"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
