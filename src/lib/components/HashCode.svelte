@@ -1,24 +1,23 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 	import Link03 from './icons/Link03.svelte';
-	export let hashCode: string;
+	export let hashCode: string | undefined;
 
 	let showTooltip = false;
 </script>
 
 <button
 	on:click={() => {
-		navigator.clipboard.writeText(hashCode);
+		navigator.clipboard.writeText(hashCode ?? '');
 		showTooltip = true;
 		setTimeout(() => {
 			showTooltip = false;
 		}, 1000);
 	}}
-	class="border-1 flex flex-row items-center gap-1 rounded-lg border-gray-modern-200 px-3 py-2"
+	class="flex flex-row items-center gap-1 rounded-lg border-1 border-gray-modern-200 px-3 py-2"
 >
 	<Link03 class="h-4 w-4 stroke-gray-modern-600" />
-	<span class="text-xs text-gray-modern-600">Hash Code :</span>
-	<span class=" text-xs font-bold text-gray-modern-900">{hashCode}</span>
+	<span class="text-xs text-gray-modern-600">Hash Code</span>
 </button>
 
 {#if showTooltip}

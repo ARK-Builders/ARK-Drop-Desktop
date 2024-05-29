@@ -2,8 +2,18 @@
 	import { goto } from '$app/navigation';
 	import Code from '$lib/components/Code.svelte';
 	import ChevronLeft from '$lib/components/icons/ChevronLeft.svelte';
+	import { invoke } from '@tauri-apps/api';
 
-	let codes = [56, 46, 36];
+	export let data;
+
+	let codes = [data.confirmationCode];
+
+	while (codes.length < 3) {
+		const randomCode = Math.floor(Math.random() * 100);
+		if (!codes.includes(randomCode)) {
+			codes.push(randomCode);
+		}
+	}
 </script>
 
 <header class="my-2 flex flex-row justify-between px-4 py-2">
@@ -29,9 +39,11 @@
 		{#each codes as code}
 			<Code
 				{code}
-				on:click={() => {
-					if (code === 56) {
-						goto('/transfers/transferring');
+				on:click={async () => {
+					if (code === data.confirmationCode) {
+						await invoke('recieve_files', {
+							ticket: data.hash
+						});
 					} else {
 						goto('/transfers/failed');
 					}

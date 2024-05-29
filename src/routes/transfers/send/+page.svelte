@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { goto } from '$app/navigation';
 	import ChevronLeft from '$lib/components/icons/ChevronLeft.svelte';
 	import Scan from '$lib/components/icons/Scan.svelte';
@@ -7,9 +7,19 @@
 	import QrCode from '$lib/components/QrCode.svelte';
 	import { onMount } from 'svelte';
 	import HashCode from '$lib/components/HashCode.svelte';
+	import { invoke } from '@tauri-apps/api';
+	import { getConfirmationCode } from '$lib/util.js';
 
-	let confirmationCode = 56;
-	let hashCode = '3910-LKA9-28HS-HAXX-72LA';
+	export let data;
+
+	let confirmationCode: number | undefined;
+	let hashCode: string | undefined;
+
+	onMount(async () => {
+		hashCode = (await invoke('generate_ticket', { path: data.file })) as string;
+
+		confirmationCode = getConfirmationCode(hashCode);
+	});
 
 	let connected = false;
 </script>

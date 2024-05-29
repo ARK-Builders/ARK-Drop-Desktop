@@ -7,25 +7,25 @@
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/Button.svelte';
 
-	const getSelectedFiles = async () => {
+	const getSelectedFile = async () => {
 		const selected = await open({
-			multiple: true
+			multiple: false
 		});
 
 		if (selected === null) {
-			return [];
+			return null;
 		}
 
 		if (Array.isArray(selected)) {
-			return selected;
+			return selected[0];
 		}
 
-		return [selected];
+		return selected;
 	};
 </script>
 
 <header
-	class="border-b-1 flex flex-row items-center justify-between border-gray-modern-200 px-4 py-5"
+	class="flex flex-row items-center justify-between border-b-1 border-gray-modern-200 px-4 py-5"
 >
 	<div class="text-gray-modern-900">
 		<h3 class="text-sm">Hi Alice,</h3>
@@ -47,13 +47,11 @@
 	<div class="flex flex-row justify-center gap-[1.125rem] p-4">
 		<Button
 			on:click={async () => {
-				const files = await getSelectedFiles();
-				if (files.length > 0) {
-					goto(`/transfers/send`, {
-						state: {
-							files
-						}
-					});
+				const file = await getSelectedFile();
+				if (file) {
+					const params = new URLSearchParams();
+					params.append('file', file);
+					goto(`/transfers/send?${params.toString()}`);
 				}
 			}}
 			class="w-32"
