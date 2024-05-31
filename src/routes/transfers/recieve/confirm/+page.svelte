@@ -41,9 +41,7 @@
 				{code}
 				on:click={async () => {
 					if (code === data.confirmationCode) {
-						await invoke('recieve_files', {
-							ticket: data.hash
-						});
+						goto('/transfers/transferring?ticket=' + data.hash);
 					} else {
 						goto('/transfers/failed');
 					}

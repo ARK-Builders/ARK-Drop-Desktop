@@ -7,9 +7,9 @@
 	import { formatBytes, formatTime } from '$lib/util';
 	import FileUploaded from './FileUploaded.svelte';
 
-	let file = 'Img 2718. JPG';
-	let transferedSize = 1_500_000; // bytes
-	let fileSize = 4_700_000; // bytes
+	export let fileName = 'Img 2718. JPG';
+	export let transferedSize = 1_500_000; // bytes
+	export let fileSize = 4_700_000; // bytes
 
 	let internetSpeed = 1_000_000; // bytes/s
 	let timeLeft = (fileSize - transferedSize) / internetSpeed; // seconds
@@ -19,20 +19,6 @@
 	}
 
 	const dispatch = createEventDispatcher();
-
-	onMount(() => {
-		const updateSpeed = 10;
-		const interval = setInterval(() => {
-			transferedSize += internetSpeed / updateSpeed;
-			timeLeft = (fileSize - transferedSize) / internetSpeed;
-
-			if (transferedSize >= fileSize) {
-				clearInterval(interval);
-				dispatch('done');
-			}
-		}, 1000 / updateSpeed);
-		return () => clearInterval(interval);
-	});
 
 	let openModal = false;
 </script>
@@ -44,7 +30,7 @@
 				<FileType />
 			</div>
 			<div class="flex flex-1 flex-col justify-between py-1">
-				<span class="text-sm font-medium text-gray-modern-900">{file}</span>
+				<span class="text-sm font-medium text-gray-modern-900">{fileName}</span>
 				<p class="flex flex-row items-center gap-1 text-xs text-gray-modern-500">
 					{formatBytes(transferedSize)} of {formatBytes(fileSize)}
 					<svg
@@ -82,7 +68,7 @@
 {:else}
 	<FileUploaded
 		fileUploaded={{
-			fileName: file,
+			fileName: fileName,
 			fileSize: fileSize,
 			recipient: 'Aurora',
 			sentAt: new Date()
@@ -107,7 +93,7 @@
 					<FileType />
 				</div>
 				<div class="flex flex-1 flex-col justify-between py-1">
-					<span class="text-sm font-medium text-gray-modern-900">{file}</span>
+					<span class="text-sm font-medium text-gray-modern-900">{fileName}</span>
 					<p class="flex flex-row items-center gap-1 text-xs text-gray-modern-500">
 						{formatBytes(fileSize)}
 					</p>

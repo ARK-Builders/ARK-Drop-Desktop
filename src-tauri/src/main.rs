@@ -11,30 +11,24 @@ use iroh::{
 };
 use iroh_base::ticket::BlobTicket;
 use iroh_blobs::{util::SetTagOption, BlobFormat};
-use rand::Rng;
+use serde::Serialize;
 use tauri::{InvokeError, Manager};
 use walkdir::WalkDir;
 
 struct AppState {
-    pub iroh: Node<iroh_blobs::store::fs::Store>,
+    pub iroh: Node<iroh_blobs::store::mem::Store>,
 }
 
 impl AppState {
-    fn new(iroh: Node<iroh_blobs::store::fs::Store>) -> Self {
+    fn new(iroh: Node<iroh_blobs::store::mem::Store>) -> Self {
         AppState { iroh }
     }
 }
 
 async fn setup<R: tauri::Runtime>(handle: tauri::AppHandle<R>) -> Result<()> {
-    let suffix = rand::thread_rng().gen::<[u8; 16]>();
-    let iroh_data_dir =
-        std::env::current_dir()?.join(format!(".ark-drop-data-{}", hex::encode(suffix)));
-
     // create the iroh node
-    let node = iroh::node::Node::persistent(iroh_data_dir)
-        .await?
-        .spawn()
-        .await?;
+    let node = iroh::node::Node::memory().spawn().await?;
+
     handle.manage(AppState::new(node));
 
     Ok(())
@@ -46,7 +40,6 @@ fn main() {
             let handle = app.handle();
 
             tauri::async_runtime::spawn(async move {
-                println!("starting backend...");
                 if let Err(err) = setup(handle).await {
                     eprintln!("failed: {:?}", err);
                 }
@@ -54,13 +47,17 @@ fn main() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![generate_ticket, recieve_files])
+        .invoke_handler(tauri::generate_handler![
+            generate_ticket,
+            recieve_files,
+            open_file
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
 async fn create_file_collection(
-    db: &Node<iroh_blobs::store::fs::Store>,
+    db: &Node<iroh_blobs::store::mem::Store>,
     path: &PathBuf,
 ) -> Result<Vec<(PathBuf, AddOutcome)>> {
     try_join_all(
@@ -104,8 +101,7 @@ async fn generate_ticket(
     let collection = outcome
         .into_iter()
         .map(|(path, outcome)| {
-            // not sure if unwrap is safe here
-            let name = path.into_os_string().into_string().unwrap();
+            let name = path.file_name().unwrap().to_string_lossy().to_string();
             let hash = outcome.hash;
             return (name, hash);
         })
@@ -123,19 +119,30 @@ async fn generate_ticket(
         .map_err(InvokeError::from_anyhow)
 }
 
+#[derive(Serialize)]
+struct FileInfo {
+    pub path: PathBuf,
+    pub name: String,
+    pub size: u64,
+}
+
+#[derive(Serialize)]
+struct RecieveFilesResponse {
+    pub files: Vec<FileInfo>,
+    pub downloaded_size: u64,
+}
+
 #[tauri::command]
 async fn recieve_files(
     state: tauri::State<'_, AppState>,
     ticket: String,
-) -> Result<(), InvokeError> {
+) -> Result<RecieveFilesResponse, InvokeError> {
     let node = &state.iroh;
 
     let ticket = BlobTicket::from_str(&ticket)
         .map_err(|e| InvokeError::from_anyhow(anyhow::anyhow!("failed to parse ticket: {}", e)))?;
 
-    let addrs: iroh_net::NodeAddr = node.my_addr().await.map_err(InvokeError::from_anyhow)?;
-
-    if (ticket.format() != BlobFormat::HashSeq) {
+    if ticket.format() != BlobFormat::HashSeq {
         return Err(InvokeError::from_anyhow(anyhow::anyhow!(
             "unsupported format: {:?}",
             ticket.format()
@@ -160,6 +167,8 @@ async fn recieve_files(
         .context("expect hash with `BlobFormat::HashSeq` to be a collection")
         .map_err(InvokeError::from_anyhow)?;
 
+    let mut files: Vec<FileInfo> = Vec::new();
+
     for (name, hash) in collection.iter() {
         let content = node
             .blobs
@@ -169,7 +178,7 @@ async fn recieve_files(
 
         let path = PathBuf::from(name);
 
-        let file_path = std::env::current_dir()
+        let file_path = dirs::desktop_dir()
             .context("failed to get current directory")
             .map_err(InvokeError::from_anyhow)?
             .join(
@@ -178,10 +187,25 @@ async fn recieve_files(
                     .map_err(InvokeError::from_anyhow)?,
             );
 
+        files.push(FileInfo {
+            path: file_path.clone(),
+            name: name.clone(),
+            size: content.len() as u64,
+        });
+
         std::fs::write(&file_path, content)
             .context("failed to write file")
             .map_err(InvokeError::from_anyhow)?;
     }
 
-    Ok(())
+    Ok(RecieveFilesResponse {
+        files,
+        downloaded_size: outcome.downloaded_size,
+    })
+}
+
+#[tauri::command]
+fn open_file(file: PathBuf) -> Result<(), InvokeError> {
+    open::that(file)
+        .map_err(|e| InvokeError::from_anyhow(anyhow::anyhow!("failed to open file: {}", e)))
 }
