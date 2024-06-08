@@ -209,3 +209,11 @@ fn open_file(file: PathBuf) -> Result<(), InvokeError> {
     open::that(file)
         .map_err(|e| InvokeError::from_anyhow(anyhow::anyhow!("failed to open file: {}", e)))
 }
+
+#[tauri::command]
+fn is_valid_ticket(ticket: String) -> Result<bool, InvokeError> {
+    let ticket = BlobTicket::from_str(&ticket)
+        .map_err(|e| InvokeError::from_anyhow(anyhow::anyhow!("failed to parse ticket: {}", e)))?;
+
+    Ok(ticket.format() == BlobFormat::HashSeq)
+}

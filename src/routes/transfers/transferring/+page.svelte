@@ -31,7 +31,6 @@
 		responseData = await invoke('recieve_files', {
 			ticket: data.ticket
 		});
-		console.log(responseData);
 		time_complete = Date.now() - time;
 		done = true;
 	});

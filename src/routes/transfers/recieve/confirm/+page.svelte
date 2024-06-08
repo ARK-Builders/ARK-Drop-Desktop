@@ -6,6 +6,12 @@
 
 	export let data;
 
+	let isValidHash = invoke('is_valid_ticket', { ticket: data.hash });
+
+	if (!isValidHash) {
+		goto('/transfers');
+	}
+
 	let codes = [data.confirmationCode];
 
 	while (codes.length < 3) {
