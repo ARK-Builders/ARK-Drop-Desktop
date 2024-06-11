@@ -7,32 +7,25 @@
 	import { onMount } from 'svelte';
 	import { invoke } from '@tauri-apps/api';
 	import { formatTime } from '$lib/util.js';
+	import { listen } from '@tauri-apps/api/event';
+	import type { FileTransfer as FileTransferDTO } from '$lib/types';
 
 	export let data;
-
-	type RecieveFiles = {
-		path: string;
-		name: string;
-		size: number;
-	};
-
-	type RecieveFilesResponseData = {
-		download_size: number;
-		files: RecieveFiles[];
-	};
 
 	let avatars = ['avatar', 'avatar2'];
 	let time_complete: number | undefined = undefined;
 	let done = false;
-	let responseData: RecieveFilesResponseData | undefined = undefined;
+
+	let transferFiles: FileTransferDTO[] = [];
 
 	onMount(async () => {
-		let time = Date.now();
-		responseData = await invoke('recieve_files', {
+		await invoke('recieve_files', {
 			ticket: data.ticket
 		});
-		time_complete = Date.now() - time;
-		done = true;
+	});
+
+	listen('download_progress', (event) => {
+		transferFiles = event.payload as FileTransferDTO[];
 	});
 </script>
 
@@ -90,10 +83,9 @@
 	{/if}
 
 	<div class="my-6 flex w-11/12 flex-col gap-2">
-		{#each responseData?.files ?? [] as file}
+		{#each transferFiles as file}
 			<FileTransfer
-				fileName={file.name}
-				fileSize={file.size}
+				{file}
 				on:cancel={() => {
 					goto('/transfers');
 				}}
@@ -102,7 +94,7 @@
 	</div>
 	<Button
 		on:click={() => {
-			invoke('open_file', { file: responseData?.files[0].path });
+			// invoke('open_file', { file: responseData?.files[0].path });
 		}}
 		variant="secondary"
 	>

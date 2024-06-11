@@ -6,13 +6,36 @@
 	import Button from './Button.svelte';
 	import { formatBytes, formatTime } from '$lib/util';
 	import FileUploaded from './FileUploaded.svelte';
+	import type { FileTransfer as FileTransferDTO } from '$lib/types';
 
-	export let fileName = 'Img 2718. JPG';
-	export let transferedSize = 1_500_000; // bytes
-	export let fileSize = 4_700_000; // bytes
+	export let file: FileTransferDTO;
 
-	let internetSpeed = 1_000_000; // bytes/s
-	let timeLeft = (fileSize - transferedSize) / internetSpeed; // seconds
+	let previousFile = file;
+
+	let internetSpeed = 0; // bytes/s
+	let timeLeft = 0; // seconds
+
+	$: {
+		if (internetSpeed === 0) {
+			timeLeft = 0;
+		} else {
+			timeLeft = (file.total - file.transfered) / internetSpeed;
+		}
+	}
+
+	onMount(() => {
+		const interval = setInterval(() => {
+			if (previousFile.transfered !== file.transfered) {
+				internetSpeed = file.transfered - previousFile.transfered;
+				timeLeft = (file.total - file.transfered) / internetSpeed;
+				previousFile = file;
+			}
+		}, 1000);
+
+		return () => {
+			clearInterval(interval);
+		};
+	});
 
 	function percentComplete(done: number, all: number) {
 		return Math.floor((done / all) * 100);
@@ -23,16 +46,16 @@
 	let openModal = false;
 </script>
 
-{#if transferedSize < fileSize}
+{#if file.transfered < file.total}
 	<div class="flex w-full flex-col gap-3 rounded-2xl border-1 p-3">
 		<div class="flex flex-row items-center gap-3">
 			<div class="h-11 w-11 rounded-full border-1 p-[10px]">
 				<FileType />
 			</div>
 			<div class="flex flex-1 flex-col justify-between py-1">
-				<span class="text-sm font-medium text-gray-modern-900">{fileName}</span>
+				<span class="text-sm font-medium text-gray-modern-900">{file.name}</span>
 				<p class="flex flex-row items-center gap-1 text-xs text-gray-modern-500">
-					{formatBytes(transferedSize)} of {formatBytes(fileSize)}
+					{formatBytes(file.transfered)} of {formatBytes(file.total)}
 					<svg
 						class="fill-gray-modern-500"
 						width="4"
@@ -56,10 +79,10 @@
 			</button>
 		</div>
 
-		{#if transferedSize < fileSize}
+		{#if file.transfered < file.total}
 			<div class="relative h-[6px] w-full rounded-full bg-gray-modern-300">
 				<div
-					style={`--percent-complete: ${100 - percentComplete(transferedSize, fileSize)}%`}
+					style={`--percent-complete: ${100 - percentComplete(file.transfered, file.total)}%`}
 					class={`absolute left-0 right-[var(--percent-complete)] h-full rounded-full bg-blue-dark-500`}
 				></div>
 			</div>
@@ -68,8 +91,7 @@
 {:else}
 	<FileUploaded
 		fileUploaded={{
-			fileName: fileName,
-			fileSize: fileSize,
+			...file,
 			recipient: 'Aurora',
 			sentAt: new Date()
 		}}
@@ -93,9 +115,9 @@
 					<FileType />
 				</div>
 				<div class="flex flex-1 flex-col justify-between py-1">
-					<span class="text-sm font-medium text-gray-modern-900">{fileName}</span>
+					<span class="text-sm font-medium text-gray-modern-900">{file.name}</span>
 					<p class="flex flex-row items-center gap-1 text-xs text-gray-modern-500">
-						{formatBytes(fileSize)}
+						{formatBytes(file.total)}
 					</p>
 				</div>
 			</div>

@@ -16,7 +16,7 @@
 	let hashCode: string | undefined;
 
 	onMount(async () => {
-		hashCode = (await invoke('generate_ticket', { path: data.file })) as string;
+		hashCode = (await invoke('generate_ticket', { paths: data.files })) as string;
 
 		confirmationCode = getConfirmationCode(hashCode);
 	});

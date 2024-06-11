@@ -13,9 +13,9 @@
 			<FileType />
 		</div>
 		<div class="flex flex-1 flex-col justify-between py-1">
-			<span class="text-sm font-medium text-gray-modern-900">{fileUploaded.fileName}</span>
+			<span class="text-sm font-medium text-gray-modern-900">{fileUploaded.name}</span>
 			<p class="flex flex-row items-center gap-1 text-xs text-gray-modern-500">
-				{formatBytes(fileUploaded.fileSize)}
+				{formatBytes(fileUploaded.total)}
 			</p>
 		</div>
 		<CheckCircle class="h-6 w-6 stroke-blue-dark-500" />

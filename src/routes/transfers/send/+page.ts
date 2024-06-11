@@ -1,8 +1,9 @@
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = ({ url }) => {
-	const file = url.searchParams.get('file');
+	const files = url.searchParams.getAll('file');
+
 	return {
-		file
+		files
 	};
 };
