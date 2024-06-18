@@ -15,14 +15,6 @@
 	let internetSpeed = 0; // bytes/s
 	let timeLeft = 0; // seconds
 
-	$: {
-		if (internetSpeed === 0) {
-			timeLeft = 0;
-		} else {
-			timeLeft = (file.total - file.transfered) / internetSpeed;
-		}
-	}
-
 	onMount(() => {
 		const interval = setInterval(() => {
 			if (previousFile.transfered !== file.transfered) {

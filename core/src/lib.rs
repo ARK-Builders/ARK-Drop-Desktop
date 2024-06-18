@@ -1,7 +1,7 @@
 pub mod erorr;
 pub mod metadata;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use erorr::{IrohError, IrohResult};
 use futures_buffered::try_join_all;
@@ -14,6 +14,7 @@ use iroh_base::ticket::BlobTicket;
 use iroh_blobs::{
     format::collection::Collection,
     get::db::{BlobId, DownloadProgress},
+    hashseq::{self, HashSeq},
     store,
     util::SetTagOption,
     BlobFormat,
@@ -33,8 +34,6 @@ pub struct FileTransfer {
     pub name: String,
     pub transfered: u64,
     pub total: u64,
-    pub child: u64,
-    pub id: u64,
 }
 
 impl IrohInstance {
@@ -119,88 +118,92 @@ impl IrohInstance {
             .download_hash_seq(ticket.hash(), ticket.node_addr().clone())
             .await?;
 
-        let mut metaDataHash = None;
         let mut metadata: Option<CollectionMetadata> = None;
-
-        // we should use BTreeMap to keep the order of the files
+        let mut hashseq: Option<HashSeq> = None;
         let mut files: Vec<FileTransfer> = Vec::new();
+
+        let mut map: BTreeMap<u64, String> = BTreeMap::new();
 
         while let Some(chunk) = download_stream.next().await {
             let chunk = chunk?;
             match chunk {
-                DownloadProgress::Found {
-                    id,
-                    child,
-                    hash,
-                    size,
-                } => match u64::from(child) {
-                    1 => {
-                        // blob indicating all the hashes in the collection
+                DownloadProgress::FoundHashSeq { hash, .. } => {
+                    let hs = self.node.blobs.read_to_bytes(hash).await?;
+                    let hs = HashSeq::try_from(hs)?;
+                    let meta_hash = hs.iter().next().context("No metadata hash found")?;
+                    let meta_bytes = self.node.blobs.read_to_bytes(meta_hash).await?;
+
+                    let meta: CollectionMetadata =
+                        postcard::from_bytes(&meta_bytes).context("Failed to parse metadata")?;
+
+                    if meta.names.len() + 1 != hs.len() {
+                        return Err(anyhow::anyhow!("names and links length mismatch").into());
                     }
-                    2 => {
-                        // blob indicating the metadata of the collection
-                        metaDataHash = Some((id, hash));
+                    hashseq = Some(hs);
+                    metadata = Some(meta);
+                }
+                DownloadProgress::AllDone(stats) => {
+                    let collection = self.node.blobs.get_collection(ticket.hash()).await?;
+                    files = vec![];
+                    for (name, hash) in collection.iter() {
+                        let content = self.node.blobs.read_to_bytes(*hash).await?;
+                        files.push({
+                            FileTransfer {
+                                name: name.clone(),
+                                transfered: content.len() as u64,
+                                total: content.len() as u64,
+                            }
+                        })
                     }
-                    n => {
-                        // blob indicating the file
-                        files.push(FileTransfer {
-                            name: "Unknown File".to_string().into(),
-                            transfered: 0,
-                            total: size,
-                            child: n - 2,
-                            id,
-                        });
-                    }
-                },
-                DownloadProgress::Progress { id, offset } => {
-                    if let Some(file) = files.iter_mut().find(|file| file.id == id) {
-                        file.transfered = offset;
-                        // if we have metadata, we can update the file name
-                        if let Some(metadata) = &metadata {
-                            if let Some(name) = metadata.file_names.get(file.child as usize) {
-                                file.name = name.clone();
+                    handle_chunk(files.clone());
+                    return Ok(collection);
+                }
+                DownloadProgress::Found { id, hash, size, .. } => match (&hashseq, &metadata) {
+                    (Some(hashseq), Some(metadata)) => {
+                        if let Some(idx) = hashseq.iter().position(|h| h == hash) {
+                            if idx >= 1 && idx <= metadata.names.len() {
+                                if let Some(name) = metadata.names.get(idx - 1) {
+                                    files.push(FileTransfer {
+                                        name: name.clone(),
+                                        transfered: 0,
+                                        total: size,
+                                    });
+                                    handle_chunk(files.clone());
+                                    map.insert(id, name.clone());
+                                }
                             }
                         }
                     }
-                }
-                DownloadProgress::Done { id } => {
-                    if let Some((metadata_id, metadata_hash)) = metaDataHash {
-                        if id == metadata_id {
-                            metadata = Some(CollectionMetadata::from_bytes(
-                                self.node.blobs.read_to_bytes(metadata_hash).await?,
-                            )?);
-                        }
-                    } else {
-                        if let Some(file) = files.iter_mut().find(|file| file.id == id) {
-                            file.transfered = file.total;
+                    _ => {}
+                },
+                DownloadProgress::Progress { id, offset } => {
+                    if let Some(name) = map.get(&id) {
+                        if let Some(file) = files.iter_mut().find(|file| file.name == **name) {
+                            file.transfered = offset;
                         }
                     }
+                    handle_chunk(files.clone());
                 }
+                DownloadProgress::FoundLocal { hash, size, .. } => match (&hashseq, &metadata) {
+                    (Some(hashseq), Some(metadata)) => {
+                        if let Some(idx) = hashseq.iter().position(|h| h == hash) {
+                            if let Some(name) = metadata.names.get(idx - 1) {
+                                if let Some(file) = files.iter_mut().find(|file| file.name == *name)
+                                {
+                                    file.transfered = size.value();
+                                    file.total = size.value();
+                                    handle_chunk(files.clone());
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                },
                 _ => {}
             }
-
-            handle_chunk(files.clone());
         }
 
         let collection = self.node.blobs.get_collection(ticket.hash()).await?;
-
-        files = vec![];
-
-        for (name, hash) in collection.iter() {
-            let content = self.node.blobs.read_to_bytes(*hash).await?;
-            files.push({
-                FileTransfer {
-                    name: name.clone(),
-                    transfered: content.len() as u64,
-                    total: content.len() as u64,
-                    child: 0,
-                    id: 0,
-                }
-            })
-        }
-
-        handle_chunk(files.clone());
-
         Ok(collection)
     }
 
