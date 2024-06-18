@@ -3,14 +3,10 @@
 
 use std::{path::PathBuf, str::FromStr, vec};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use drop_core::FileTransfer;
 use drop_core::IrohInstance;
-use futures_buffered::join_all;
-use futures_buffered::try_join_all;
 use iroh_base::ticket::BlobTicket;
-use iroh_blobs::export::export_collection;
-use iroh_blobs::get::db::DownloadProgress;
 use iroh_blobs::BlobFormat;
 use tauri::{generate_context, generate_handler, InvokeError, Manager};
 use tokio::sync::mpsc;

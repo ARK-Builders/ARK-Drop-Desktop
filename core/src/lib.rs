@@ -12,16 +12,12 @@ use iroh::{
 };
 use iroh_base::ticket::BlobTicket;
 use iroh_blobs::{
-    format::collection::Collection,
-    get::db::{BlobId, DownloadProgress},
-    hashseq::{self, HashSeq},
-    store,
-    util::SetTagOption,
-    BlobFormat,
+    format::collection::Collection, get::db::DownloadProgress, hashseq::HashSeq,
+    util::SetTagOption, BlobFormat,
 };
 use metadata::CollectionMetadata;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fs::File, iter::Iterator, num::NonZeroU64, vec};
+use std::{collections::BTreeMap, iter::Iterator, vec};
 use std::{path::PathBuf, str::FromStr};
 
 type IrohNode = Node<iroh_blobs::store::mem::Store>;
@@ -142,7 +138,7 @@ impl IrohInstance {
                     hashseq = Some(hs);
                     metadata = Some(meta);
                 }
-                DownloadProgress::AllDone(stats) => {
+                DownloadProgress::AllDone(_) => {
                     let collection = self.node.blobs.get_collection(ticket.hash()).await?;
                     files = vec![];
                     for (name, hash) in collection.iter() {
