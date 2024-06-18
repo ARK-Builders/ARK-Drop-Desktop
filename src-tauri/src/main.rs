@@ -70,7 +70,7 @@ fn main() {
         .invoke_handler(generate_handler![
             generate_ticket,
             recieve_files,
-            open_file,
+            open_directory,
             is_valid_ticket
         ])
         .run(generate_context!())
@@ -113,7 +113,7 @@ async fn generate_ticket(
 async fn recieve_files(
     state: tauri::State<'_, AppState>,
     ticket: String,
-) -> Result<(), InvokeError> {
+) -> Result<PathBuf, InvokeError> {
     let async_proc_input_tx = state.inner.lock().await;
 
     let mut handles = Vec::new();
@@ -139,17 +139,16 @@ async fn recieve_files(
 
     state
         .iroh
-        .export_collection(files, outpath)
+        .export_collection(files, outpath.clone())
         .await
         .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
 
-    return Ok(());
+    Ok(outpath)
 }
 
 #[tauri::command]
-fn open_file(file: PathBuf) -> Result<(), InvokeError> {
-    open::that(file)
-        .map_err(|e| InvokeError::from_anyhow(anyhow::anyhow!("failed to open file: {}", e)))
+fn open_directory(directory: PathBuf) -> Result<(), InvokeError> {
+    open::that(directory).map_err(|e| InvokeError::from_anyhow(anyhow!(e)))
 }
 
 #[tauri::command]

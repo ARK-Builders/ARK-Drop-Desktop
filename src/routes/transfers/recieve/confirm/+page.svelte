@@ -20,6 +20,8 @@
 			codes.push(randomCode);
 		}
 	}
+
+	codes = codes.sort(() => Math.random() - 0.5);
 </script>
 
 <header class="my-2 flex flex-row justify-between px-4 py-2">

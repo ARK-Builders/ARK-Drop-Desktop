@@ -44,9 +44,9 @@ impl IrohInstance {
 
     pub async fn create_collection_from_files<'a>(
         &self,
-        paths: &'a Vec<PathBuf>,
+        paths: &'a [PathBuf],
     ) -> IrohResult<Vec<(&'a PathBuf, AddOutcome)>> {
-        try_join_all(paths.into_iter().map(|path| async move {
+        try_join_all(paths.iter().map(|path| async move {
             let add_progress = self
                 .node
                 .blobs
@@ -58,16 +58,16 @@ impl IrohInstance {
                     if let Ok(progress) = progress {
                         Ok((path, progress))
                     } else {
-                        return Err(progress.err().unwrap().into());
+                        Err(progress.err().unwrap().into())
                     }
                 }
-                Err(e) => return Err(e.into()),
+                Err(e) => Err(e.into()),
             }
         }))
         .await
     }
 
-    pub async fn send_files(&self, files: &Vec<PathBuf>) -> IrohResult<BlobTicket> {
+    pub async fn send_files(&self, files: &[PathBuf]) -> IrohResult<BlobTicket> {
         let outcome = self.create_collection_from_files(files).await?;
 
         let collection = outcome
@@ -79,7 +79,7 @@ impl IrohInstance {
                     .to_string_lossy()
                     .to_string();
                 let hash = outcome.hash;
-                return (name, hash);
+                (name, hash)
             })
             .collect();
 
@@ -154,8 +154,16 @@ impl IrohInstance {
                     handle_chunk(files.clone());
                     return Ok(collection);
                 }
-                DownloadProgress::Found { id, hash, size, .. } => match (&hashseq, &metadata) {
-                    (Some(hashseq), Some(metadata)) => {
+                DownloadProgress::Done { id } => {
+                    if let Some(name) = map.get(&id) {
+                        if let Some(file) = files.iter_mut().find(|file| file.name == *name) {
+                            file.transfered = file.total;
+                        }
+                    }
+                    handle_chunk(files.clone());
+                }
+                DownloadProgress::Found { id, hash, size, .. } => {
+                    if let (Some(hashseq), Some(metadata)) = (&hashseq, &metadata) {
                         if let Some(idx) = hashseq.iter().position(|h| h == hash) {
                             if idx >= 1 && idx <= metadata.names.len() {
                                 if let Some(name) = metadata.names.get(idx - 1) {
@@ -170,8 +178,7 @@ impl IrohInstance {
                             }
                         }
                     }
-                    _ => {}
-                },
+                }
                 DownloadProgress::Progress { id, offset } => {
                     if let Some(name) = map.get(&id) {
                         if let Some(file) = files.iter_mut().find(|file| file.name == **name) {
@@ -180,21 +187,23 @@ impl IrohInstance {
                     }
                     handle_chunk(files.clone());
                 }
-                DownloadProgress::FoundLocal { hash, size, .. } => match (&hashseq, &metadata) {
-                    (Some(hashseq), Some(metadata)) => {
+                DownloadProgress::FoundLocal { hash, size, .. } => {
+                    if let (Some(hashseq), Some(metadata)) = (&hashseq, &metadata) {
                         if let Some(idx) = hashseq.iter().position(|h| h == hash) {
-                            if let Some(name) = metadata.names.get(idx - 1) {
-                                if let Some(file) = files.iter_mut().find(|file| file.name == *name)
-                                {
-                                    file.transfered = size.value();
-                                    file.total = size.value();
-                                    handle_chunk(files.clone());
+                            if idx >= 1 && idx <= metadata.names.len() {
+                                if let Some(name) = metadata.names.get(idx - 1) {
+                                    if let Some(file) =
+                                        files.iter_mut().find(|file| file.name == *name)
+                                    {
+                                        file.transfered = size.value();
+                                        file.total = size.value();
+                                        handle_chunk(files.clone());
+                                    }
                                 }
                             }
                         }
                     }
-                    _ => {}
-                },
+                }
                 _ => {}
             }
         }

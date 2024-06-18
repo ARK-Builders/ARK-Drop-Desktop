@@ -61,14 +61,15 @@
 					{formatTime(timeLeft)} left
 				</p>
 			</div>
-			<button
+			<!-- cancel button -->
+			<!-- <button
 				on:click={() => {
 					openModal = true;
 				}}
 				class="h-6 w-6"
 			>
 				<XClose class="stroke-blue-dark-500" />
-			</button>
+			</button> -->
 		</div>
 
 		{#if file.transfered < file.total}

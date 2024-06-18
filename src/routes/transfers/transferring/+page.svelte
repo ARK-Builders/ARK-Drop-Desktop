@@ -15,13 +15,16 @@
 	let avatars = ['avatar', 'avatar2'];
 	let time_complete: number | undefined = undefined;
 	let done = false;
-
+	let output = '';
 	let transferFiles: FileTransferDTO[] = [];
 
 	onMount(async () => {
-		await invoke('recieve_files', {
+		let start = Date.now();
+		output = await invoke('recieve_files', {
 			ticket: data.ticket
 		});
+		time_complete = Date.now() - start;
+		done = true;
 	});
 
 	listen('download_progress', (event) => {
@@ -92,13 +95,15 @@
 			/>
 		{/each}
 	</div>
-	<Button
-		on:click={() => {
-			// invoke('open_file', { file: responseData?.files[0].path });
-		}}
-		variant="secondary"
-	>
-		<PlusCircle class="h-5 w-5" />
-		Open in File Manager</Button
-	>
+	{#if done}
+		<Button
+			on:click={() => {
+				invoke('open_directory', { directory: output });
+			}}
+			variant="secondary"
+		>
+			<PlusCircle class="h-5 w-5" />
+			Open in File Manager</Button
+		>
+	{/if}
 </div>
