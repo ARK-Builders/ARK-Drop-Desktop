@@ -7,7 +7,7 @@
 	import QrCode from '$lib/components/QrCode.svelte';
 	import { onMount } from 'svelte';
 	import HashCode from '$lib/components/HashCode.svelte';
-	import { invoke } from '@tauri-apps/api';
+	import { invoke } from '@tauri-apps/api/core';
 	import { getConfirmationCode } from '$lib/util.js';
 
 	export let data;

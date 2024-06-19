@@ -9,14 +9,18 @@ default-run = "ark-drop"
 edition = "2021"
 rust-version = "1.60"
 
+[lib]
+name = "ark_drop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "1.5.2", features = [] }
+tauri-build = { version = "2.0.0-beta", features = [] }
 
 [dependencies]
 drop_core = { path = "../core" }
-tauri = { version = "1.6.7", features = ["dialog-open"] }
+tauri = { version = "2.0.0-beta", features = [] }
 hex = "0.4.3"
 walkdir = "2.5.0"
 flume = "0.11.0"
@@ -38,6 +42,7 @@ tokio = {  workspace = true , features = ["full"] }
 tokio-util = { workspace = true }
 futures-lite = { workspace = true }
 futures-buffered = { workspace = true }
+tauri-plugin-dialog = "2.0.0-beta.9"
 
 
 

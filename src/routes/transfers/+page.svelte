@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { open } from '@tauri-apps/api/dialog';
+	import { open, type FileResponse } from '@tauri-apps/plugin-dialog';
 
 	import NavBar from '$lib/components/NavBar.svelte';
 	import ArrowCircleBrokenDown from '$lib/components/icons/ArrowCircleBrokenDown.svelte';
@@ -7,15 +7,13 @@
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/Button.svelte';
 
-	const getSelectedFiles = async () => {
+	const getSelectedFiles: () => Promise<FileResponse[]> = async () => {
 		const selected = await open({
 			multiple: true
 		});
 
 		if (selected === null) {
 			return [];
-		} else if (!Array.isArray(selected)) {
-			return [selected];
 		} else {
 			return selected;
 		}
@@ -53,7 +51,8 @@
 
 				const params = new URLSearchParams();
 				for (const file of files) {
-					params.append('file', file);
+					let fileName = file.path;
+					params.append('file', fileName);
 				}
 				goto(`/transfers/send?${params.toString()}`);
 			}}
