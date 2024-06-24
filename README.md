@@ -1,13 +1,13 @@
-# Ark Drop
+# ARK Drop
 
-Ark Drop is designed for easy file transfer. You can use QR codes to quickly send and receive files between devices. This app is part of Ark Framework and uses [`iroh`](https://iroh.computer/docs) to sync data between devices.
+ARK Drop is designed for easy file transfer. You can use QR codes to quickly send and receive files between devices. This app is part of ARK Framework and uses [`iroh`](https://iroh.computer/docs) to sync data between devices.
 
 > [!WARNING]
-> Ark Drop is currently under heavy development and should be used with caution. It has not undergone extensive testing and may contain bugs, vulnerabilities, or unexpected behavior.
+> ARK Drop is currently under heavy development and should be used with caution. It has not undergone extensive testing and may contain bugs, vulnerabilities, or unexpected behavior.
 
 ## Development
 
-Ark Drop is built using [Tauri](https://tauri.app/) with [SvelteKit](https://kit.svelte.dev/).
+ARK Drop is built using [Tauri](https://tauri.app/) with [SvelteKit](https://kit.svelte.dev/).
 
 ### Tauri
 
@@ -17,9 +17,9 @@ Ark Drop is built using [Tauri](https://tauri.app/) with [SvelteKit](https://kit
 
 [SvelteKit](https://kit.svelte.dev/) is an application framework built on Svelte. Unlike traditional frameworks, SvelteKit shifts work to a compile step during the build process, resulting in code that directly updates the DOM when the application's state changes, enhancing performance.
 
-## Running Ark Drop Locally
+## Running ARK Drop Locally
 
-You can use either `cargo tauri` CLI or `npm` CLI commands to run Ark Drop locally.
+You can use either `cargo tauri` CLI or `npm` CLI commands to run ARK Drop locally.
 
 ### Installing `cargo tauri`
 
