@@ -3,6 +3,10 @@ name = "drop_core"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "drop_core"
+crate-type = ["cdylib", "lib"]
+
 [dependencies]
 iroh = {workspace = true}
 iroh-blobs = {workspace = true}
@@ -14,3 +18,7 @@ futures-buffered = {workspace = true}
 futures-lite = {workspace = true}
 serde = {workspace = true}
 postcard = "1.0.8"
+uniffi = { version = "0.28.0"}
+
+[build-dependencies]
+uniffi = { version = "0.28.0", features = [ "build" ] }

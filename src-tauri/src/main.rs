@@ -7,6 +7,7 @@ use anyhow::{anyhow, Result};
 use drop_core::FileTransfer;
 use drop_core::IrohInstance;
 use iroh_base::ticket::BlobTicket;
+use iroh_blobs::format::collection::Collection;
 use iroh_blobs::BlobFormat;
 use tauri::{generate_context, generate_handler, InvokeError, Manager};
 use tokio::sync::mpsc;
@@ -137,13 +138,28 @@ async fn recieve_files(
 
     let outpath = dirs::download_dir().unwrap();
 
-    state
-        .iroh
-        .export_collection(files, outpath.clone())
-        .await
-        .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
+    export_collection(&state.iroh, files, &outpath).await?;
 
     Ok(outpath)
+}
+
+pub async fn export_collection(
+    iroh: &IrohInstance,
+    collection: Collection,
+    outpath: &PathBuf,
+) -> Result<(), InvokeError> {
+    for (name, hash) in collection.iter() {
+        let content = iroh
+            .get_node()
+            .blobs
+            .read_to_bytes(*hash)
+            .await
+            .map_err(|e| InvokeError::from_anyhow(anyhow!("failed to read blob: {}", e)))?;
+        let file_path = outpath.join(name);
+        let _ = std::fs::write(&file_path, content);
+    }
+
+    Ok(())
 }
 
 #[tauri::command]

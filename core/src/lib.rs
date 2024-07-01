@@ -17,58 +17,45 @@ use iroh_blobs::{
 };
 use metadata::CollectionMetadata;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, iter::Iterator, vec};
+use std::{collections::BTreeMap, iter::Iterator, sync::Arc, vec};
 use std::{path::PathBuf, str::FromStr};
 
-type IrohNode = Node<iroh_blobs::store::mem::Store>;
+#[derive(uniffi::Object)]
+struct IrohNode(pub Node<iroh_blobs::store::mem::Store>);
+
+uniffi::setup_scaffolding!();
+
+#[derive(uniffi::Object)]
 pub struct IrohInstance {
-    node: IrohNode,
+    node: Arc<IrohNode>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(uniffi::Object)]
+struct DropCollection(Collection);
+
+#[derive(Debug, Serialize, Deserialize, Clone, uniffi::Object)]
 pub struct FileTransfer {
     pub name: String,
     pub transfered: u64,
     pub total: u64,
 }
 
+#[uniffi::export]
 impl IrohInstance {
-    pub async fn new() -> Result<Self> {
+    #[uniffi::constructor]
+    pub async fn new() -> IrohResult<Self> {
         let node = Node::memory().spawn().await?;
-        Ok(Self { node })
+        Ok(Self {
+            node: Arc::new(IrohNode(node)),
+        })
     }
 
-    pub fn get_node(&self) -> &IrohNode {
-        &self.node
-    }
-
-    pub async fn create_collection_from_files<'a>(
-        &self,
-        paths: &'a [PathBuf],
-    ) -> IrohResult<Vec<(&'a PathBuf, AddOutcome)>> {
-        try_join_all(paths.iter().map(|path| async move {
-            let add_progress = self
-                .node
-                .blobs
-                .add_from_path(path.clone(), true, SetTagOption::Auto, WrapOption::NoWrap)
-                .await;
-            match add_progress {
-                Ok(add_progress) => {
-                    let progress = add_progress.finish().await;
-                    if let Ok(progress) = progress {
-                        Ok((path, progress))
-                    } else {
-                        Err(progress.err().unwrap().into())
-                    }
-                }
-                Err(e) => Err(e.into()),
-            }
-        }))
-        .await
+    pub fn get_node(&self) -> Arc<IrohNode> {
+        self.node.clone()
     }
 
     pub async fn send_files(&self, files: &[PathBuf]) -> IrohResult<BlobTicket> {
-        let outcome = self.create_collection_from_files(files).await?;
+        let outcome = create_collection_from_files(self, files).await?;
 
         let collection = outcome
             .into_iter()
@@ -85,11 +72,13 @@ impl IrohInstance {
 
         let (hash, _) = self
             .node
+            .0
             .blobs
             .create_collection(collection, SetTagOption::Auto, Default::default())
             .await?;
 
         self.node
+            .0
             .blobs
             .share(hash, BlobFormat::HashSeq, Default::default())
             .await
@@ -101,7 +90,7 @@ impl IrohInstance {
         ticket: String,
         // closure to handle each chunk
         mut handle_chunk: impl FnMut(Vec<FileTransfer>),
-    ) -> IrohResult<Collection> {
+    ) -> IrohResult<DropCollection> {
         let ticket = BlobTicket::from_str(&ticket)?;
 
         if ticket.format() != BlobFormat::HashSeq {
@@ -110,6 +99,7 @@ impl IrohInstance {
 
         let mut download_stream = self
             .node
+            .0
             .blobs
             .download_hash_seq(ticket.hash(), ticket.node_addr().clone())
             .await?;
@@ -210,21 +200,46 @@ impl IrohInstance {
             }
         }
 
-        let collection = self.node.blobs.get_collection(ticket.hash()).await?;
-        Ok(collection)
+        let collection = self.node.0.blobs.get_collection(ticket.hash()).await?;
+        Ok(DropCollection(collection))
+    }
+}
+
+pub async fn create_collection_from_files<'a>(
+    iroh: &IrohInstance,
+    paths: &'a [PathBuf],
+) -> IrohResult<Vec<(&'a PathBuf, AddOutcome)>> {
+    try_join_all(paths.iter().map(|path| async move {
+        let add_progress = iroh
+            .get_node()
+            .blobs
+            .add_from_path(path.clone(), true, SetTagOption::Auto, WrapOption::NoWrap)
+            .await;
+        match add_progress {
+            Ok(add_progress) => {
+                let progress = add_progress.finish().await;
+                if let Ok(progress) = progress {
+                    Ok((path, progress))
+                } else {
+                    Err(progress.err().unwrap().into())
+                }
+            }
+            Err(e) => Err(e.into()),
+        }
+    }))
+    .await
+}
+
+uniffi::custom_type!(BlobTicket, String);
+
+impl UniffiCustomTypeConverter for BlobTicket {
+    type Builtin = String;
+
+    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
+        Ok(BlobTicket::from_str(&val).map_err(|e| anyhow::anyhow!(e))?)
     }
 
-    pub async fn export_collection(
-        &self,
-        collection: Collection,
-        outpath: PathBuf,
-    ) -> IrohResult<()> {
-        for (name, hash) in collection.iter() {
-            let content = self.node.blobs.read_to_bytes(*hash).await?;
-            let file_path = outpath.join(name);
-            let _ = std::fs::write(&file_path, content);
-        }
-
-        Ok(())
+    fn from_custom(obj: Self) -> Self::Builtin {
+        obj.to_string()
     }
 }
