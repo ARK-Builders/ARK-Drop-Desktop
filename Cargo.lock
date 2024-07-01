@@ -98,26 +98,12 @@ dependencies = [
  "anyhow",
  "dirs",
  "drop_core",
- "flume",
- "futures-buffered",
- "futures-lite 2.3.0",
- "hex",
- "iroh",
  "iroh-base",
  "iroh-blobs",
- "iroh-net",
- "num_cpus",
  "open",
- "rand 0.8.5",
- "serde",
- "serde_json",
  "tauri",
  "tauri-build",
  "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "walkdir",
 ]
 
 [[package]]
@@ -1203,7 +1189,6 @@ name = "drop_core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytes",
  "futures-buffered",
  "futures-lite 2.3.0",
  "iroh",

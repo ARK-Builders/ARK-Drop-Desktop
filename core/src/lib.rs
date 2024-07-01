@@ -34,7 +34,7 @@ pub struct FileTransfer {
 
 impl IrohInstance {
     pub async fn new() -> Result<Self> {
-        let node = iroh::node::Node::memory().spawn().await?;
+        let node = Node::memory().spawn().await?;
         Ok(Self { node })
     }
 
@@ -132,6 +132,8 @@ impl IrohInstance {
                     let meta: CollectionMetadata =
                         postcard::from_bytes(&meta_bytes).context("Failed to parse metadata")?;
 
+                    // The hash sequence should have one more element than the metadata
+                    // because the first element is the metadata itself
                     if meta.names.len() + 1 != hs.len() {
                         return Err(anyhow::anyhow!("names and links length mismatch").into());
                     }

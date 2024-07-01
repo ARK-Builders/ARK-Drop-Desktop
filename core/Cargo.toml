@@ -11,7 +11,6 @@ iroh-net = {workspace = true}
 anyhow = {workspace = true}
 thiserror = {workspace = true}
 futures-buffered = {workspace = true}
-bytes = {workspace = true}
 futures-lite = {workspace = true}
 serde = {workspace = true}
 postcard = "1.0.8"
