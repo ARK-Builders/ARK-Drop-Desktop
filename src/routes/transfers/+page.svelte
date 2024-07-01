@@ -12,6 +12,8 @@
 			multiple: true
 		});
 
+		console.log(123, selected);
+
 		if (selected === null) {
 			return [];
 		} else {

@@ -137,7 +137,7 @@ async fn recieve_files(
         let _ = handle.await;
     }
 
-    let outpath = dirs::download_dir().unwrap();
+    let outpath = dirs::home_dir().unwrap();
 
     state
         .iroh

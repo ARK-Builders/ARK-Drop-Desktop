@@ -1,7 +1,0 @@
-[[permission]]
-identifier = "allow-camera"
-description = """
-Allow the app to access the camera.
-"""
-commands.allow = ["camera"]
-

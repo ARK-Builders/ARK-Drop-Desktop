@@ -171,19 +171,6 @@
     "Identifier": {
       "oneOf": [
         {
-          "type": "string",
-          "enum": [
-            "default"
-          ]
-        },
-        {
-          "description": "allow-camera -> Allow the app to access the camera.\n",
-          "type": "string",
-          "enum": [
-            "allow-camera"
-          ]
-        },
-        {
           "description": "app:default -> Default permissions for the plugin.",
           "type": "string",
           "enum": [

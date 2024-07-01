@@ -1,65 +1,24 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import ChevronLeft from '$lib/components/icons/ChevronLeft.svelte';
+	import { Html5Qrcode } from 'html5-qrcode';
 	import { onMount } from 'svelte';
-	import QrScanner from 'qr-scanner';
 
 	let videoSource: HTMLVideoElement | null = null;
 	let loading = false;
-	let qrScanner: QrScanner | null = null;
+
+	const qrCodeSuccessCallback = (decodedText: string, _decodedResult: any) => {
+		goto('/transfers/recieve/confirm?hash=' + decodedText);
+	};
+	const config = { fps: 10, qrbox: { width: 200, height: 200 } };
 
 	onMount(() => {
-		// polyfill for navigator.permissions
-		let permissions = navigator.permissions;
+		const html5QrCode = new Html5Qrcode('reader');
 
-		if (typeof navigator.permissions === 'undefined') {
-			permissions = {
-				query: (params: any) =>
-					new Promise((resolve, reject) => {
-						const permission = { state: 'granted', onchange: null };
-						resolve(permission as PermissionStatus);
-					})
-			};
-		}
+		html5QrCode.start({ facingMode: 'environment' }, config, qrCodeSuccessCallback, () => {});
 
-		permissions.query({ name: 'camera' as PermissionName }).then((permission) => {
-			if (permission.state === 'denied') {
-				goto('/transfers');
-			}
-
-			loading = true;
-
-			navigator.mediaDevices
-				.getUserMedia({
-					audio: false,
-					video: true
-				})
-				.then((stream) => {
-					if (!videoSource) return;
-
-					videoSource.srcObject = stream;
-					videoSource.play();
-					loading = false;
-
-					qrScanner = new QrScanner(
-						videoSource,
-						(result) => {
-							goto('/transfers/recieve/confirm?hash=' + result.data);
-						},
-						{
-							highlightCodeOutline: true,
-							highlightScanRegion: true
-						}
-					);
-
-					qrScanner.start();
-				});
-		});
-
-		return () => {
-			if (qrScanner) {
-				qrScanner.stop();
-			}
+		() => {
+			html5QrCode.stop();
 		};
 	});
 </script>
@@ -76,6 +35,6 @@
 	</button>
 </header>
 
-<video class="absolute inset-0 z-0 h-full bg-black object-contain" bind:this={videoSource}>
-	<track kind="captions" />
-</video>
+<div class="absolute inset-0 z-0 flex h-full items-center bg-black object-contain">
+	<div id="reader" class="aspect-square w-full"></div>
+</div>
