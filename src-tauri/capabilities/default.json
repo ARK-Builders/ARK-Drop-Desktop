@@ -1,8 +1,8 @@
 {
-	"identifier": "migrated",
+	"identifier": "default",
 	"description": "permissions that were migrated from v1",
 	"local": true,
-	"windows": ["main"],
+	"windows": ["*"],
 	"permissions": [
 		"path:default",
 		"event:default",

@@ -9,7 +9,20 @@
 	let qrScanner: QrScanner | null = null;
 
 	onMount(() => {
-		navigator.permissions.query({ name: 'camera' as PermissionName }).then((permission) => {
+		// polyfill for navigator.permissions
+		let permissions = navigator.permissions;
+
+		if (typeof navigator.permissions === 'undefined') {
+			permissions = {
+				query: (params: any) =>
+					new Promise((resolve, reject) => {
+						const permission = { state: 'granted', onchange: null };
+						resolve(permission as PermissionStatus);
+					})
+			};
+		}
+
+		permissions.query({ name: 'camera' as PermissionName }).then((permission) => {
 			if (permission.state === 'denied') {
 				goto('/transfers');
 			}
