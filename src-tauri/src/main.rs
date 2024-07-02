@@ -151,6 +151,7 @@ pub async fn export_collection(
     for (name, hash) in collection.iter() {
         let content = iroh
             .get_node()
+            .0
             .blobs
             .read_to_bytes(*hash)
             .await

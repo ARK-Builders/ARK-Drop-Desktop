@@ -1,7 +1,7 @@
 pub mod erorr;
 pub mod metadata;
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 
 use erorr::{IrohError, IrohResult};
 use futures_buffered::try_join_all;
@@ -20,29 +20,22 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, iter::Iterator, sync::Arc, vec};
 use std::{path::PathBuf, str::FromStr};
 
-#[derive(uniffi::Object)]
-struct IrohNode(pub Node<iroh_blobs::store::mem::Store>);
-
 uniffi::setup_scaffolding!();
 
-#[derive(uniffi::Object)]
+pub struct IrohNode(pub Node<iroh_blobs::store::mem::Store>);
+
 pub struct IrohInstance {
     node: Arc<IrohNode>,
 }
 
-#[derive(uniffi::Object)]
-struct DropCollection(Collection);
-
-#[derive(Debug, Serialize, Deserialize, Clone, uniffi::Object)]
+#[derive(Debug, Serialize, Deserialize, Clone, uniffi::Record)]
 pub struct FileTransfer {
     pub name: String,
     pub transfered: u64,
     pub total: u64,
 }
 
-#[uniffi::export]
 impl IrohInstance {
-    #[uniffi::constructor]
     pub async fn new() -> IrohResult<Self> {
         let node = Node::memory().spawn().await?;
         Ok(Self {
@@ -90,7 +83,7 @@ impl IrohInstance {
         ticket: String,
         // closure to handle each chunk
         mut handle_chunk: impl FnMut(Vec<FileTransfer>),
-    ) -> IrohResult<DropCollection> {
+    ) -> IrohResult<Collection> {
         let ticket = BlobTicket::from_str(&ticket)?;
 
         if ticket.format() != BlobFormat::HashSeq {
@@ -114,10 +107,10 @@ impl IrohInstance {
             let chunk = chunk?;
             match chunk {
                 DownloadProgress::FoundHashSeq { hash, .. } => {
-                    let hs = self.node.blobs.read_to_bytes(hash).await?;
+                    let hs = self.node.0.blobs.read_to_bytes(hash).await?;
                     let hs = HashSeq::try_from(hs)?;
                     let meta_hash = hs.iter().next().context("No metadata hash found")?;
-                    let meta_bytes = self.node.blobs.read_to_bytes(meta_hash).await?;
+                    let meta_bytes = self.node.0.blobs.read_to_bytes(meta_hash).await?;
 
                     let meta: CollectionMetadata =
                         postcard::from_bytes(&meta_bytes).context("Failed to parse metadata")?;
@@ -131,10 +124,10 @@ impl IrohInstance {
                     metadata = Some(meta);
                 }
                 DownloadProgress::AllDone(_) => {
-                    let collection = self.node.blobs.get_collection(ticket.hash()).await?;
+                    let collection = self.node.0.blobs.get_collection(ticket.hash()).await?;
                     files = vec![];
                     for (name, hash) in collection.iter() {
-                        let content = self.node.blobs.read_to_bytes(*hash).await?;
+                        let content = self.node.0.blobs.read_to_bytes(*hash).await?;
                         files.push({
                             FileTransfer {
                                 name: name.clone(),
@@ -201,7 +194,7 @@ impl IrohInstance {
         }
 
         let collection = self.node.0.blobs.get_collection(ticket.hash()).await?;
-        Ok(DropCollection(collection))
+        Ok(collection)
     }
 }
 
@@ -212,6 +205,7 @@ pub async fn create_collection_from_files<'a>(
     try_join_all(paths.iter().map(|path| async move {
         let add_progress = iroh
             .get_node()
+            .0
             .blobs
             .add_from_path(path.clone(), true, SetTagOption::Auto, WrapOption::NoWrap)
             .await;
@@ -228,18 +222,4 @@ pub async fn create_collection_from_files<'a>(
         }
     }))
     .await
-}
-
-uniffi::custom_type!(BlobTicket, String);
-
-impl UniffiCustomTypeConverter for BlobTicket {
-    type Builtin = String;
-
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-        Ok(BlobTicket::from_str(&val).map_err(|e| anyhow::anyhow!(e))?)
-    }
-
-    fn from_custom(obj: Self) -> Self::Builtin {
-        obj.to_string()
-    }
 }
