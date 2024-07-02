@@ -35,6 +35,11 @@ pub struct FileTransfer {
     pub total: u64,
 }
 
+#[uniffi::export]
+fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
 impl IrohInstance {
     pub async fn new() -> IrohResult<Self> {
         let node = Node::memory().spawn().await?;

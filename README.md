@@ -26,5 +26,5 @@ cross build -p drop_core --target x86_64-linux-android
 Generate the bindings using uniffi for kotlin
 
 ```sh
-cargo run -p uniffi-bingen generate --library target/x86_64-linux-android/debug/libark_drop_lib.so --language=kotlin --out-dir ./bindings
+cargo run -p uniffi-bingen generate --library target/x86_64-linux-android/debug/libdrop_core.so --language=kotlin --out-dir ./bindings
 ```

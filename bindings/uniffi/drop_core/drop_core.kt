@@ -690,6 +690,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -705,6 +707,8 @@ internal interface UniffiLib : Library {
         
     }
 
+    fun uniffi_drop_core_fn_func_add(`a`: Int,`b`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): Int
     fun ffi_drop_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun ffi_drop_core_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -817,6 +821,8 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_drop_core_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    fun uniffi_drop_core_checksum_func_add(
+    ): Short
     fun ffi_drop_core_uniffi_contract_version(
     ): Int
     
@@ -834,6 +840,9 @@ private fun uniffiCheckContractApiVersion(lib: UniffiLib) {
 
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: UniffiLib) {
+    if (lib.uniffi_drop_core_checksum_func_add() != 36557.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
 }
 
 // Async support
@@ -873,6 +882,26 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
 
 /** Used to instantiate an interface without an actual pointer, for fakes in tests, mostly. */
 object NoPointer
+
+public object FfiConverterInt: FfiConverter<Int, Int> {
+    override fun lift(value: Int): Int {
+        return value
+    }
+
+    override fun read(buf: ByteBuffer): Int {
+        return buf.getInt()
+    }
+
+    override fun lower(value: Int): Int {
+        return value
+    }
+
+    override fun allocationSize(value: Int) = 4UL
+
+    override fun write(value: Int, buf: ByteBuffer) {
+        buf.putInt(value)
+    }
+}
 
 public object FfiConverterULong: FfiConverter<ULong, Long> {
     override fun lift(value: Long): ULong {
@@ -1049,5 +1078,14 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
             FfiConverterString.write(it, buf)
         }
     }
+} fun `add`(`a`: kotlin.Int, `b`: kotlin.Int): kotlin.Int {
+            return FfiConverterInt.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_drop_core_fn_func_add(
+        FfiConverterInt.lower(`a`),FfiConverterInt.lower(`b`),_status)
 }
+    )
+    }
+    
+
 
