@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, uniffi::Record)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct CollectionMetadata {
-    pub header: Vec<u8>, // Must contain "CollectionV0."
+    pub header: [u8; 13], // Must contain "CollectionV0."
     pub names: Vec<String>,
 }
