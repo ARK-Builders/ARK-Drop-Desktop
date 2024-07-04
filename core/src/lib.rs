@@ -1,7 +1,7 @@
 pub mod erorr;
 pub mod metadata;
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 
 use erorr::{IrohError, IrohResult};
 use futures_buffered::try_join_all;
@@ -17,28 +17,70 @@ use iroh_blobs::{
 };
 use metadata::CollectionMetadata;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, iter::Iterator, sync::Arc, vec};
+use std::{
+    collections::BTreeMap,
+    iter::Iterator,
+    sync::{mpsc::Sender, Arc},
+    vec,
+};
 use std::{path::PathBuf, str::FromStr};
 
-#[derive(uniffi::Object)]
-struct IrohNode(pub Node<iroh_blobs::store::mem::Store>);
-
 uniffi::setup_scaffolding!();
+
+#[derive(uniffi::Object)]
+pub struct IrohNode(pub Node<iroh_blobs::store::mem::Store>);
 
 #[derive(uniffi::Object)]
 pub struct IrohInstance {
     node: Arc<IrohNode>,
 }
 
-#[derive(uniffi::Object)]
-struct DropCollection(Collection);
-
-#[derive(Debug, Serialize, Deserialize, Clone, uniffi::Object)]
+#[derive(Debug, Serialize, Deserialize, Clone, uniffi::Record)]
 pub struct FileTransfer {
     pub name: String,
     pub transfered: u64,
     pub total: u64,
 }
+
+uniffi::custom_type!(PathBuf, String);
+
+impl UniffiCustomTypeConverter for PathBuf {
+    type Builtin = String;
+
+    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
+        Ok(PathBuf::from(val))
+    }
+
+    fn from_custom(obj: Self) -> Self::Builtin {
+        obj.to_string_lossy().to_string()
+    }
+}
+
+uniffi::custom_type!(BlobTicket, String);
+
+impl UniffiCustomTypeConverter for BlobTicket {
+    type Builtin = String;
+
+    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
+        Ok(BlobTicket::from_str(&val)?)
+    }
+
+    fn from_custom(obj: Self) -> Self::Builtin {
+        obj.to_string()
+    }
+}
+
+#[derive(uniffi::Object)]
+pub struct DropCollection(pub Collection);
+
+impl From<Collection> for DropCollection {
+    fn from(collection: Collection) -> Self {
+        Self(collection)
+    }
+}
+
+#[derive(uniffi::Object)]
+pub struct FileTransferHandle(pub Sender<Vec<FileTransfer>>);
 
 #[uniffi::export]
 impl IrohInstance {
@@ -54,7 +96,7 @@ impl IrohInstance {
         self.node.clone()
     }
 
-    pub async fn send_files(&self, files: &[PathBuf]) -> IrohResult<BlobTicket> {
+    pub async fn send_files(&self, files: Vec<PathBuf>) -> IrohResult<BlobTicket> {
         let outcome = create_collection_from_files(self, files).await?;
 
         let collection = outcome
@@ -88,8 +130,7 @@ impl IrohInstance {
     pub async fn recieve_files(
         &self,
         ticket: String,
-        // closure to handle each chunk
-        mut handle_chunk: impl FnMut(Vec<FileTransfer>),
+        handle_chunk: Arc<FileTransferHandle>,
     ) -> IrohResult<DropCollection> {
         let ticket = BlobTicket::from_str(&ticket)?;
 
@@ -114,10 +155,10 @@ impl IrohInstance {
             let chunk = chunk?;
             match chunk {
                 DownloadProgress::FoundHashSeq { hash, .. } => {
-                    let hs = self.node.blobs.read_to_bytes(hash).await?;
+                    let hs = self.node.0.blobs.read_to_bytes(hash).await?;
                     let hs = HashSeq::try_from(hs)?;
                     let meta_hash = hs.iter().next().context("No metadata hash found")?;
-                    let meta_bytes = self.node.blobs.read_to_bytes(meta_hash).await?;
+                    let meta_bytes = self.node.0.blobs.read_to_bytes(meta_hash).await?;
 
                     let meta: CollectionMetadata =
                         postcard::from_bytes(&meta_bytes).context("Failed to parse metadata")?;
@@ -131,10 +172,10 @@ impl IrohInstance {
                     metadata = Some(meta);
                 }
                 DownloadProgress::AllDone(_) => {
-                    let collection = self.node.blobs.get_collection(ticket.hash()).await?;
+                    let collection = self.node.0.blobs.get_collection(ticket.hash()).await?;
                     files = vec![];
                     for (name, hash) in collection.iter() {
-                        let content = self.node.blobs.read_to_bytes(*hash).await?;
+                        let content = self.node.0.blobs.read_to_bytes(*hash).await?;
                         files.push({
                             FileTransfer {
                                 name: name.clone(),
@@ -143,8 +184,8 @@ impl IrohInstance {
                             }
                         })
                     }
-                    handle_chunk(files.clone());
-                    return Ok(collection);
+                    handle_chunk.0.send(files.clone())?;
+                    return Ok(collection.into());
                 }
                 DownloadProgress::Done { id } => {
                     if let Some(name) = map.get(&id) {
@@ -152,7 +193,7 @@ impl IrohInstance {
                             file.transfered = file.total;
                         }
                     }
-                    handle_chunk(files.clone());
+                    handle_chunk.0.send(files.clone())?;
                 }
                 DownloadProgress::Found { id, hash, size, .. } => {
                     if let (Some(hashseq), Some(metadata)) = (&hashseq, &metadata) {
@@ -164,7 +205,7 @@ impl IrohInstance {
                                         transfered: 0,
                                         total: size,
                                     });
-                                    handle_chunk(files.clone());
+                                    handle_chunk.0.send(files.clone())?;
                                     map.insert(id, name.clone());
                                 }
                             }
@@ -177,7 +218,7 @@ impl IrohInstance {
                             file.transfered = offset;
                         }
                     }
-                    handle_chunk(files.clone());
+                    handle_chunk.0.send(files.clone())?;
                 }
                 DownloadProgress::FoundLocal { hash, size, .. } => {
                     if let (Some(hashseq), Some(metadata)) = (&hashseq, &metadata) {
@@ -189,7 +230,7 @@ impl IrohInstance {
                                     {
                                         file.transfered = size.value();
                                         file.total = size.value();
-                                        handle_chunk(files.clone());
+                                        handle_chunk.0.send(files.clone())?;
                                     }
                                 }
                             }
@@ -201,17 +242,18 @@ impl IrohInstance {
         }
 
         let collection = self.node.0.blobs.get_collection(ticket.hash()).await?;
-        Ok(DropCollection(collection))
+        Ok(collection.into())
     }
 }
 
 pub async fn create_collection_from_files<'a>(
     iroh: &IrohInstance,
-    paths: &'a [PathBuf],
-) -> IrohResult<Vec<(&'a PathBuf, AddOutcome)>> {
+    paths: Vec<PathBuf>,
+) -> IrohResult<Vec<(PathBuf, AddOutcome)>> {
     try_join_all(paths.iter().map(|path| async move {
         let add_progress = iroh
             .get_node()
+            .0
             .blobs
             .add_from_path(path.clone(), true, SetTagOption::Auto, WrapOption::NoWrap)
             .await;
@@ -219,7 +261,7 @@ pub async fn create_collection_from_files<'a>(
             Ok(add_progress) => {
                 let progress = add_progress.finish().await;
                 if let Ok(progress) = progress {
-                    Ok((path, progress))
+                    Ok((path.clone(), progress))
                 } else {
                     Err(progress.err().unwrap().into())
                 }
@@ -228,18 +270,4 @@ pub async fn create_collection_from_files<'a>(
         }
     }))
     .await
-}
-
-uniffi::custom_type!(BlobTicket, String);
-
-impl UniffiCustomTypeConverter for BlobTicket {
-    type Builtin = String;
-
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-        Ok(BlobTicket::from_str(&val).map_err(|e| anyhow::anyhow!(e))?)
-    }
-
-    fn from_custom(obj: Self) -> Self::Builtin {
-        obj.to_string()
-    }
 }

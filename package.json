@@ -3,6 +3,7 @@
 	"version": "0.0.1",
 	"private": true,
 	"scripts": {
+		"uniffi:kotlin:debug": "cargo run -p uniffi-bingen generate --library ./target/debug/drop_core.dll --language=kotlin --out-dir ./bindings",
 		"tauri": "tauri",
 		"dev": "vite dev",
 		"build": "vite build",
