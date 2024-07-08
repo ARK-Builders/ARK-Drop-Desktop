@@ -42,7 +42,11 @@
 	"productName": "ark_drop",
 	"version": "0.1.0",
 	"identifier": "dev.arkbuilders.drop",
-	"plugins": {},
+	"plugins": {
+		"fs": {
+			"scope": ["**/*"]
+		}
+	},
 	"app": {
 		"windows": [
 			{
