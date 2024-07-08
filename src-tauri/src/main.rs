@@ -158,7 +158,7 @@ pub async fn export_collection(
         let content = iroh
             .get_node()
             .0
-            .blobs
+            .blobs()
             .read_to_bytes(*hash)
             .await
             .map_err(|e| InvokeError::from_anyhow(anyhow!("failed to read blob: {}", e)))?;

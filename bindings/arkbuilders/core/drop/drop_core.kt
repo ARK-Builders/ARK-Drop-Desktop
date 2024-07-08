@@ -3,7 +3,7 @@
 
 @file:Suppress("NAME_SHADOWING")
 
-package uniffi.drop_core
+package arkbuilders.core.drop
 
 // Common helper code.
 //
@@ -361,7 +361,7 @@ private fun findLibraryName(componentName: String): String {
     if (libOverride != null) {
         return libOverride
     }
-    return "drop_core"
+    return "arkdrop"
 }
 
 private inline fun <reified Lib : Library> loadIndirect(

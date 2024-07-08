@@ -96,9 +96,14 @@ impl IrohInstance {
         self.node.clone()
     }
 
+    // This function accepts a list of file paths returns a BlobTicket
+    // which is a string that can be used to retrieve the files from another node.
     pub async fn send_files(&self, files: Vec<PathBuf>) -> IrohResult<BlobTicket> {
+        // Import a series of blobs from the file system paths
         let outcome = create_collection_from_files(self, files).await?;
 
+        // A series of blobs is the same as a collection
+        // but we need to convert the structure slightly to implicitly create it
         let collection = outcome
             .into_iter()
             .map(|(path, outcome)| {
@@ -112,21 +117,25 @@ impl IrohInstance {
             })
             .collect();
 
+        // we now also import this collection into the node
         let (hash, _) = self
             .node
             .0
-            .blobs
+            .blobs()
             .create_collection(collection, SetTagOption::Auto, Default::default())
             .await?;
 
+        // We can now generate a ticket from this collection
         self.node
             .0
-            .blobs
+            .blobs()
             .share(hash, BlobFormat::HashSeq, Default::default())
             .await
             .map_err(|e| e.into())
     }
 
+    // This function accepts a BlobTicket and a FileTransferHandle (a channel to send progress updates to the client)
+    // and returns a DropCollection (a wrapper around a collection)
     pub async fn recieve_files(
         &self,
         ticket: String,
@@ -138,10 +147,11 @@ impl IrohInstance {
             return Err(IrohError::UnsupportedFormat(ticket.format()));
         }
 
+        // Download the collection from the node
         let mut download_stream = self
             .node
             .0
-            .blobs
+            .blobs()
             .download_hash_seq(ticket.hash(), ticket.node_addr().clone())
             .await?;
 
@@ -151,14 +161,16 @@ impl IrohInstance {
 
         let mut map: BTreeMap<u64, String> = BTreeMap::new();
 
+        // the download stream is a stream of download progress events
+        // we can send these events to the client to update the progress
         while let Some(chunk) = download_stream.next().await {
             let chunk = chunk?;
             match chunk {
                 DownloadProgress::FoundHashSeq { hash, .. } => {
-                    let hs = self.node.0.blobs.read_to_bytes(hash).await?;
+                    let hs = self.node.0.blobs().read_to_bytes(hash).await?;
                     let hs = HashSeq::try_from(hs)?;
                     let meta_hash = hs.iter().next().context("No metadata hash found")?;
-                    let meta_bytes = self.node.0.blobs.read_to_bytes(meta_hash).await?;
+                    let meta_bytes = self.node.0.blobs().read_to_bytes(meta_hash).await?;
 
                     let meta: CollectionMetadata =
                         postcard::from_bytes(&meta_bytes).context("Failed to parse metadata")?;
@@ -172,10 +184,10 @@ impl IrohInstance {
                     metadata = Some(meta);
                 }
                 DownloadProgress::AllDone(_) => {
-                    let collection = self.node.0.blobs.get_collection(ticket.hash()).await?;
+                    let collection = self.node.0.blobs().get_collection(ticket.hash()).await?;
                     files = vec![];
                     for (name, hash) in collection.iter() {
-                        let content = self.node.0.blobs.read_to_bytes(*hash).await?;
+                        let content = self.node.0.blobs().read_to_bytes(*hash).await?;
                         files.push({
                             FileTransfer {
                                 name: name.clone(),
@@ -241,7 +253,8 @@ impl IrohInstance {
             }
         }
 
-        let collection = self.node.0.blobs.get_collection(ticket.hash()).await?;
+        // If we reach this point, the download stream has ended without completing the download
+        let collection = self.node.0.blobs().get_collection(ticket.hash()).await?;
         Ok(collection.into())
     }
 }
@@ -254,7 +267,7 @@ pub async fn create_collection_from_files<'a>(
         let add_progress = iroh
             .get_node()
             .0
-            .blobs
+            .blobs()
             .add_from_path(path.clone(), true, SetTagOption::Auto, WrapOption::NoWrap)
             .await;
         match add_progress {

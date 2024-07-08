@@ -1,4 +1,4 @@
-use std::{error::Error, sync::mpsc::SendError};
+use std::sync::mpsc::SendError;
 
 use iroh_blobs::BlobFormat;
 use thiserror::Error;
@@ -69,7 +69,7 @@ uniffi::custom_type!(IrohBaseError, String);
 impl UniffiCustomTypeConverter for IrohBaseError {
     type Builtin = String;
 
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
+    fn into_custom(_val: Self::Builtin) -> uniffi::Result<Self> {
         Ok(iroh_base::ticket::Error::Kind { expected: "None" })
     }
 
@@ -83,7 +83,7 @@ uniffi::custom_type!(SendFileError, String);
 impl UniffiCustomTypeConverter for SendFileError {
     type Builtin = String;
 
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
+    fn into_custom(_val: Self::Builtin) -> uniffi::Result<Self> {
         Err(anyhow::anyhow!("send error").into())
     }
 

@@ -18,7 +18,7 @@ Build the cdylib for all the targets
 
 ```sh
 cross build -p drop_core --target aarch64-linux-android
-cross build -p drop_core --target armv7-linux-androideab
+cross build -p drop_core --target armv7-linux-androideabi
 cross build -p drop_core --target i686-linux-android
 cross build -p drop_core --target x86_64-linux-android
 ```

@@ -2834,9 +2834,9 @@ checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
 
 [[package]]
 name = "iroh"
-version = "0.17.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "906100b305fb5008b193c9004f05e6a31b3b1c358fce0f780fdd3c1909e43241"
+checksum = "f3c2abfb692f6b0539aca300ebc96a12cd515387ee92f662b0358489a1bbf435"
 dependencies = [
  "anyhow",
  "bao-tree",
@@ -2862,6 +2862,7 @@ dependencies = [
  "postcard",
  "quic-rpc",
  "rand 0.8.5",
+ "ref-cast",
  "serde",
  "strum 0.25.0",
  "tempfile",
@@ -2875,9 +2876,9 @@ dependencies = [
 
 [[package]]
 name = "iroh-base"
-version = "0.17.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1be0b442ed44d20905cf77c673169906c883e05c829e3fb303b131e925139fc"
+checksum = "23110fcb84b1b8c797768db88d1ef0696f53a249d0c6aa78bf6a5fedef19c9b2"
 dependencies = [
  "aead",
  "anyhow",
@@ -2917,9 +2918,9 @@ dependencies = [
 
 [[package]]
 name = "iroh-blobs"
-version = "0.17.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5b99863d557104010b94b4b69f3721ea0a8fea00c3002f2521edd77bb676635"
+checksum = "ed4dbc80349ff769c0bc0f634f747130de2e3e201ff52b6266ca5459e8ebbb44"
 dependencies = [
  "anyhow",
  "bao-tree",
@@ -2957,19 +2958,23 @@ dependencies = [
 
 [[package]]
 name = "iroh-docs"
-version = "0.17.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e768d16fef62e8dbefedab63b31706b64267e972a6420cbc5824907508c931ae"
+checksum = "a2fd3285684b39ded7b44cf8f655b61bf0df5689823f0b9ecf9b26be3c343853"
 dependencies = [
  "anyhow",
  "bytes",
  "derive_more 1.0.0-beta.6",
  "ed25519-dalek",
  "flume",
+ "futures-buffered",
+ "futures-lite 2.3.0",
  "futures-util",
  "hex",
  "iroh-base",
  "iroh-blake3",
+ "iroh-blobs",
+ "iroh-gossip",
  "iroh-metrics",
  "iroh-net",
  "lru",
@@ -2992,9 +2997,9 @@ dependencies = [
 
 [[package]]
 name = "iroh-gossip"
-version = "0.17.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "857aa77a0b29283edf99224bd12cd739684c5873e639b85adb38b8d1d777162d"
+checksum = "de2dcd328c13e90bb86deebd76cf5e922caca31f5cc8bbfeeda52657c94f145b"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3031,9 +3036,9 @@ dependencies = [
 
 [[package]]
 name = "iroh-metrics"
-version = "0.17.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd54b9cf342b2618efc8d3ff6cdcd083fa5a2cf6cc78bb473bd32e228eabb40e"
+checksum = "c29fb720e7327eefd813adcdd7ccae550dcef601ec9f6a77b97491eb3bd6bb18"
 dependencies = [
  "anyhow",
  "erased_set",
@@ -3052,9 +3057,9 @@ dependencies = [
 
 [[package]]
 name = "iroh-net"
-version = "0.17.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a744000e6c5704479eeb4751eb23b9b8e7e56a0fc484beb8831694fc93e378f"
+checksum = "2ff7e91d529120256fa2f74026aebd201ba0743b8ab2a8c486c39b17ed606c99"
 dependencies = [
  "aead",
  "anyhow",
@@ -3551,9 +3556,9 @@ dependencies = [
 
 [[package]]
 name = "netdev"
-version = "0.25.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb353f5a5a852d5cc779c1c80bec0bd14a696ef832f3a761cb10091802c37109"
+checksum = "e12d9f49b8d4b9d7f97525ce65f6527079e549e8b2f010f15b921764e73d4baa"
 dependencies = [
  "dlopen2",
  "libc",
@@ -4626,10 +4631,11 @@ dependencies = [
 
 [[package]]
 name = "quic-rpc"
-version = "0.10.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0d69b05325e19956f123fce85ebc4d99226552a0bb24bba4c886106297e708b"
+checksum = "110f0fbbf7c4a694902e11d890157245801d89a18d8e9b8d9d2afd91358a6a7c"
 dependencies = [
+ "anyhow",
  "bincode",
  "derive_more 1.0.0-beta.6",
  "educe",
