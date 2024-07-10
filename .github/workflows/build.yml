@@ -3,9 +3,65 @@ name: Build
 env:
   CARGO_TERM_COLOR: always
 
-on: [push]
+on: push
 
 jobs:
+  build-library:
+    name: Build Core Library and Kotlin Bindings
+    strategy:
+      matrix:
+        platform:
+          # - release_for: Android-aarch64
+          #   os: ubuntu-20.04
+          #   target: aarch64-linux-android
+          #   bin: ark-core
+          #   name: ark-core-Android-aarch64.zip
+          #   command: build
+          # - release_for: Android-armv7
+          #   os: ubuntu-20.04
+          #   target: armv7-linux-androideabi
+          #   bin: ark-core
+          #   name: ark-core-Android-armv7.zip
+          #   command: build
+          # - release_for: Android-i686
+          #   os: ubuntu-20.04
+          #   target: i686-linux-android
+          #   bin: ark-core
+          #   name: ark-core-Android-i686.zip
+          #   command: build
+          - release_for: Android-ax86_64
+            os: ubuntu-22.04
+            target: x86_64-linux-android
+            bin: ark-core
+            name: ark-core-Android-ax86_64.zip
+            command: build
+
+    runs-on: ${{ matrix.platform.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.settings.platform == 'ubuntu-22.04' # This must match the platform value defined above.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+      - name: Add Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.platform.target }}
+
+      - name: Install Cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Build Core Library
+        run: cross ${{ matrix.platform.command }} -p drop_core --target ${{ matrix.platform.target }}
+      - name: Generate Bindings
+        run: cargo run -p uniffi-bingen generate --library target/x86_64-linux-android/debug/libdrop_core.so --language=kotlin --out-dir ./bindings
+
   build-tauri:
     permissions:
       contents: write
@@ -13,9 +69,9 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - platform: 'macos-latest' # for Arm based macs (M1 and above).
+          - platform: 'macos-latest'
             args: '--target universal-apple-darwin'
-          - platform: 'ubuntu-22.04' # for Tauri v1 you could replace this with ubuntu-20.04.
+          - platform: 'ubuntu-22.04'
             args: ''
           - platform: 'windows-latest'
             args: ''
@@ -29,8 +85,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-        # webkitgtk 4.0 is for Tauri v1 - webkitgtk 4.1 is for Tauri v2.
-        # You can remove the one that doesn't apply to your app to speed up the workflow a bit.
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -46,8 +100,6 @@ jobs:
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
 
       - name: install frontend dependencies
         # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
@@ -67,25 +119,25 @@ jobs:
         if: matrix.settings.platform == 'windows-latest'
         with:
           name: ark-drop-Windows.zip
-          path: ./src-tauri/target/release/bundle/
+          path: ./target/release/bundle/
 
       - name: Upload Linux AppImage
         if: matrix.settings.platform == 'ubuntu-22.04'
         uses: actions/upload-artifact@v4
         with:
           name: ark-drop.AppImage
-          path: ./src-tauri/target/release/bundle/appimage/ark-drop_*_amd64.AppImage
+          path: ./target/release/bundle/appimage/ark-drop_*_amd64.AppImage
 
       - name: Upload MacOS Build (ark-drop.app)
         uses: actions/upload-artifact@v4
         if: matrix.settings.platform == 'macos-latest'
         with:
           name: ark-drop-MacOS.zip
-          path: ./src-tauri/target/universal-apple-darwin/release/bundle/macos
+          path: ./target/universal-apple-darwin/release/bundle/macos
 
       - name: Upload MacOS Build (ark-drop.dmg)
         uses: actions/upload-artifact@v4
         if: matrix.settings.platform == 'macos-latest'
         with:
           name: ark-drop-MacOS-dmg.zip
-          path: ./src-tauri/target/universal-apple-darwin/release/bundle/dmg
+          path: ./target/universal-apple-darwin/release/bundle/dmg
