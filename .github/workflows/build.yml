@@ -44,6 +44,9 @@ jobs:
         uses: swatinem/rust-cache@v2
       - name: Add Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.platform.target }}
 
       - name: Install Cross
         run: cargo install cross --git https://github.com/cross-rs/cross
