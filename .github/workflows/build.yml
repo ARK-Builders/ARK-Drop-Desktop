@@ -34,6 +34,7 @@ jobs:
             target: x86_64-linux-android
             bin: ark-core
             name: ark-core-Android-ax86_64.zip
+            outputDir: ./target/x86_64-linux-android/debug
             command: build
 
     runs-on: ${{ matrix.platform.os }}
@@ -60,7 +61,19 @@ jobs:
       - name: Build Core Library
         run: cross ${{ matrix.platform.command }} -p drop_core --target ${{ matrix.platform.target }}
       - name: Generate Bindings
-        run: cargo run -p uniffi-bingen generate --library target/x86_64-linux-android/debug/libdrop_core.so --language=kotlin --out-dir ./bindings
+        run: cargo run -p uniffi-bingen generate --library ${{ matrix.platform.outputDir }}/libdrop_core.so --language=kotlin --out-dir ./bindings
+
+      - name: Upload Library
+        uses: actions/upload-artifact@v4
+        with:
+          name: ark-drop-core.zip
+          path: ${{ matrix.platform.outputDir }}/libdrop_core.so
+
+      - name: Upload Bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: ark-drop-bindings.zip
+          path: ./bindings
 
   build-tauri:
     permissions:
