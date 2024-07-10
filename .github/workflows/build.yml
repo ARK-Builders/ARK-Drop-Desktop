@@ -42,12 +42,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Rust cache
         uses: swatinem/rust-cache@v2
-      - name: Add Cross
+      - name: Add Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Cross
         run: cargo install cross
       - name: Build Core Library
         run: cross ${{ matrix.platform.command }} -p drop_core --target ${{ matrix.platform.target }}
-      - name: install Rust stable
-        uses: dtolnay/rust-toolchain@stable
       - name: Generate Bindings
         run: cargo run -p uniffi-bingen generate --library target/x86_64-linux-android/debug/libdrop_core.so --language=kotlin --out-dir ./bindings
 
