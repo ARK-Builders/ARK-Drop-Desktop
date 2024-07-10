@@ -31,7 +31,7 @@ jobs:
           #   command: build
           - release_for: Android-ax86_64
             os: ubuntu-20.04
-            target: ax86_64-linux-android
+            target: x86_64-linux-android
             bin: ark-core
             name: ark-core-Android-ax86_64.zip
             command: build
@@ -40,14 +40,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Build binary
-        uses: houseabsolute/actions-rust-cross@v0
-        with:
-          command: ${{ matrix.platform.command }} -p drop_core
-          target: ${{ matrix.platform.target }}
-          args: '--locked --release'
-          strip: true
-
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+      - name: Add Cross
+        run: cargo install cross
+      - name: Build Core Library
+        run: cross ${{ matrix.platform.command }} -p drop_core --target ${{ matrix.platform.target }}
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
       - name: Generate Bindings
         run: cargo run -p uniffi-bingen generate --library target/x86_64-linux-android/debug/libdrop_core.so --language=kotlin --out-dir ./bindings
 
