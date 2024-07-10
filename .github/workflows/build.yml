@@ -30,7 +30,7 @@ jobs:
           #   name: ark-core-Android-i686.zip
           #   command: build
           - release_for: Android-ax86_64
-            os: ubuntu-20.04
+            os: windows-latest
             target: x86_64-linux-android
             bin: ark-core
             name: ark-core-Android-ax86_64.zip
