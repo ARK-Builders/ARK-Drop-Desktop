@@ -6,7 +6,50 @@ env:
 on: push
 
 jobs:
-  # build-library:
+  build-library:
+    name: Build Core Library and Kotlin Bindings
+    strategy:
+      matrix:
+        platform:
+          # - release_for: Android-aarch64
+          #   os: ubuntu-20.04
+          #   target: aarch64-linux-android
+          #   bin: ark-core
+          #   name: ark-core-Android-aarch64.zip
+          #   command: build
+          # - release_for: Android-armv7
+          #   os: ubuntu-20.04
+          #   target: armv7-linux-androideabi
+          #   bin: ark-core
+          #   name: ark-core-Android-armv7.zip
+          #   command: build
+          # - release_for: Android-i686
+          #   os: ubuntu-20.04
+          #   target: i686-linux-android
+          #   bin: ark-core
+          #   name: ark-core-Android-i686.zip
+          #   command: build
+          - release_for: Android-ax86_64
+            os: ubuntu-20.04
+            target: ax86_64-linux-android
+            bin: ark-core
+            name: ark-core-Android-ax86_64.zip
+            command: build
+
+    runs-on: ${{ matrix.platform.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build binary
+        uses: houseabsolute/actions-rust-cross@v0
+        with:
+          command: ${{ matrix.platform.command }} -p drop_core
+          target: ${{ matrix.platform.target }}
+          args: '--locked --release'
+          strip: true
+
+      - name: Generate Bindings
+        run: cargo run -p uniffi-bingen generate --library target/x86_64-linux-android/debug/libdrop_core.so --language=kotlin --out-dir ./bindings
 
   build-tauri:
     permissions:
