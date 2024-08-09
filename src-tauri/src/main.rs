@@ -70,7 +70,7 @@ fn main() {
         })
         .invoke_handler(generate_handler![
             generate_ticket,
-            recieve_files,
+            receive_files,
             open_directory,
             is_valid_ticket
         ])
@@ -111,7 +111,7 @@ async fn generate_ticket(
 }
 
 #[tauri::command]
-async fn recieve_files(
+async fn receive_files(
     state: tauri::State<'_, AppState>,
     ticket: String,
 ) -> Result<PathBuf, InvokeError> {
