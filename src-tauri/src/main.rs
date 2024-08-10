@@ -69,7 +69,7 @@ fn main() {
         })
         .invoke_handler(generate_handler![
             generate_ticket,
-            recieve_files,
+            receive_files,
             open_directory,
             is_valid_ticket,
             get_env
@@ -116,7 +116,7 @@ async fn generate_ticket(
 }
 
 #[tauri::command]
-async fn recieve_files(
+async fn receive_files(
     state: tauri::State<'_, AppState>,
     ticket: String,
 ) -> Result<PathBuf, InvokeError> {
@@ -139,7 +139,7 @@ async fn recieve_files(
 
     let files = state
         .iroh
-        .recieve_files(ticket, Arc::new(FileTransferHandle(tx)))
+        .receive_files(ticket, Arc::new(FileTransferHandle(tx)))
         .await
         .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
 

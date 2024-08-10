@@ -38,7 +38,7 @@ pub struct IrohInstance {
 #[derive(Debug, Serialize, Deserialize, Clone, uniffi::Record)]
 pub struct FileTransfer {
     pub name: String,
-    pub transfered: u64,
+    pub transferred: u64,
     pub total: u64,
 }
 
@@ -96,15 +96,17 @@ impl IrohInstance {
         self.node.clone()
     }
 
-    // This function accepts a list of file paths returns a BlobTicket
-    // which is a string that can be used to retrieve the files from another node.
+    /// Accepts a list of file paths.
+    ///
+    /// Returns a `BlobTicket`, which is a string that
+    /// can be used to retrieve the files from another node.
     pub async fn send_files(&self, files: Vec<PathBuf>) -> IrohResult<BlobTicket> {
         // Import a series of blobs from the file system paths
-        let outcome = create_collection_from_files(self, files).await?;
+        let outcomes = import_blobs(self, files).await?;
 
-        // A series of blobs is the same as a collection
+        // A series of blobs is the same as a collection,
         // but we need to convert the structure slightly to implicitly create it
-        let collection = outcome
+        let collection = outcomes
             .into_iter()
             .map(|(path, outcome)| {
                 let name = path
@@ -112,6 +114,7 @@ impl IrohInstance {
                     .expect("The file name is not valid.")
                     .to_string_lossy()
                     .to_string();
+
                 let hash = outcome.hash;
                 (name, hash)
             })
@@ -134,9 +137,11 @@ impl IrohInstance {
             .map_err(|e| e.into())
     }
 
-    // This function accepts a BlobTicket and a FileTransferHandle (a channel to send progress updates to the client)
-    // and returns a DropCollection (a wrapper around a collection)
-    pub async fn recieve_files(
+    /// Accepts a `BlobTicket` and a `FileTransferHandle`
+    /// (a channel to send progress updates to the client)
+    ///
+    /// Returns a `DropCollection` (a wrapper around a collection).
+    pub async fn receive_files(
         &self,
         ticket: String,
         handle_chunk: Arc<FileTransferHandle>,
@@ -155,34 +160,36 @@ impl IrohInstance {
             .download_hash_seq(ticket.hash(), ticket.node_addr().clone())
             .await?;
 
-        let mut metadata: Option<CollectionMetadata> = None;
-        let mut hashseq: Option<HashSeq> = None;
+        let mut curr_metadata: Option<CollectionMetadata> = None;
+        let mut curr_hashseq: Option<HashSeq> = None;
         let mut files: Vec<FileTransfer> = Vec::new();
 
         let mut map: BTreeMap<u64, String> = BTreeMap::new();
 
         // the download stream is a stream of download progress events
         // we can send these events to the client to update the progress
-        while let Some(chunk) = download_stream.next().await {
-            let chunk = chunk?;
-            match chunk {
+        while let Some(event) = download_stream.next().await {
+            let event = event?;
+            match event {
                 DownloadProgress::FoundHashSeq { hash, .. } => {
-                    let hs = self.node.0.blobs().read_to_bytes(hash).await?;
-                    let hs = HashSeq::try_from(hs)?;
-                    let meta_hash = hs.iter().next().context("No metadata hash found")?;
-                    let meta_bytes = self.node.0.blobs().read_to_bytes(meta_hash).await?;
+                    let hashseq = self.node.0.blobs().read_to_bytes(hash).await?;
+                    let hashseq = HashSeq::try_from(hashseq)?;
 
-                    let meta: CollectionMetadata =
-                        postcard::from_bytes(&meta_bytes).context("Failed to parse metadata")?;
+                    let metadata_hash = hashseq.iter().next().context("No metadata hash found")?;
+                    let metadata_bytes = self.node.0.blobs().read_to_bytes(metadata_hash).await?;
+
+                    let metadata: CollectionMetadata = postcard::from_bytes(&metadata_bytes)
+                        .context("Failed to parse metadata")?;
 
                     // The hash sequence should have one more element than the metadata
                     // because the first element is the metadata itself
-                    if meta.names.len() + 1 != hs.len() {
+                    if metadata.names.len() + 1 != hashseq.len() {
                         return Err(anyhow::anyhow!("names and links length mismatch").into());
                     }
-                    hashseq = Some(hs);
-                    metadata = Some(meta);
+                    curr_hashseq = Some(hashseq);
+                    curr_metadata = Some(metadata);
                 }
+
                 DownloadProgress::AllDone(_) => {
                     let collection = self.node.0.blobs().get_collection(ticket.hash()).await?;
                     files = vec![];
@@ -191,7 +198,7 @@ impl IrohInstance {
                         files.push({
                             FileTransfer {
                                 name: name.clone(),
-                                transfered: content.len() as u64,
+                                transferred: content.len() as u64,
                                 total: content.len() as u64,
                             }
                         })
@@ -199,22 +206,24 @@ impl IrohInstance {
                     handle_chunk.0.send(files.clone())?;
                     return Ok(collection.into());
                 }
+
                 DownloadProgress::Done { id } => {
                     if let Some(name) = map.get(&id) {
                         if let Some(file) = files.iter_mut().find(|file| file.name == *name) {
-                            file.transfered = file.total;
+                            file.transferred = file.total;
                         }
                     }
                     handle_chunk.0.send(files.clone())?;
                 }
+
                 DownloadProgress::Found { id, hash, size, .. } => {
-                    if let (Some(hashseq), Some(metadata)) = (&hashseq, &metadata) {
+                    if let (Some(hashseq), Some(metadata)) = (&curr_hashseq, &curr_metadata) {
                         if let Some(idx) = hashseq.iter().position(|h| h == hash) {
                             if idx >= 1 && idx <= metadata.names.len() {
                                 if let Some(name) = metadata.names.get(idx - 1) {
                                     files.push(FileTransfer {
                                         name: name.clone(),
-                                        transfered: 0,
+                                        transferred: 0,
                                         total: size,
                                     });
                                     handle_chunk.0.send(files.clone())?;
@@ -224,23 +233,25 @@ impl IrohInstance {
                         }
                     }
                 }
+
                 DownloadProgress::Progress { id, offset } => {
                     if let Some(name) = map.get(&id) {
                         if let Some(file) = files.iter_mut().find(|file| file.name == **name) {
-                            file.transfered = offset;
+                            file.transferred = offset;
                         }
                     }
                     handle_chunk.0.send(files.clone())?;
                 }
+
                 DownloadProgress::FoundLocal { hash, size, .. } => {
-                    if let (Some(hashseq), Some(metadata)) = (&hashseq, &metadata) {
+                    if let (Some(hashseq), Some(metadata)) = (&curr_hashseq, &curr_metadata) {
                         if let Some(idx) = hashseq.iter().position(|h| h == hash) {
                             if idx >= 1 && idx <= metadata.names.len() {
                                 if let Some(name) = metadata.names.get(idx - 1) {
                                     if let Some(file) =
                                         files.iter_mut().find(|file| file.name == *name)
                                     {
-                                        file.transfered = size.value();
+                                        file.transferred = size.value();
                                         file.total = size.value();
                                         handle_chunk.0.send(files.clone())?;
                                     }
@@ -249,6 +260,7 @@ impl IrohInstance {
                         }
                     }
                 }
+
                 _ => {}
             }
         }
@@ -260,28 +272,30 @@ impl IrohInstance {
     }
 }
 
-pub async fn create_collection_from_files<'a>(
+pub async fn import_blobs<'a>(
     iroh: &IrohInstance,
     paths: Vec<PathBuf>,
 ) -> IrohResult<Vec<(PathBuf, AddOutcome)>> {
-    try_join_all(paths.iter().map(|path| async move {
+    let outcomes = paths.into_iter().map(|path| async move {
         let add_progress = iroh
             .get_node()
             .0
             .blobs()
             .add_from_path(path.clone(), true, SetTagOption::Auto, WrapOption::NoWrap)
             .await;
+
         match add_progress {
             Ok(add_progress) => {
-                let progress = add_progress.finish().await;
-                if let Ok(progress) = progress {
+                let outcome = add_progress.finish().await;
+                if let Ok(progress) = outcome {
                     Ok((path.clone(), progress))
                 } else {
-                    Err(progress.err().unwrap().into())
+                    Err(outcome.err().unwrap().into())
                 }
             }
             Err(e) => Err(e.into()),
         }
-    }))
-    .await
+    });
+
+    try_join_all(outcomes).await
 }

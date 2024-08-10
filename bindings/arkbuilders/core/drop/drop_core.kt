@@ -749,7 +749,7 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_drop_core_fn_method_irohinstance_get_node(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
     ): Pointer
-    fun uniffi_drop_core_fn_method_irohinstance_recieve_files(`ptr`: Pointer,`ticket`: RustBuffer.ByValue,`handleChunk`: Pointer,
+    fun uniffi_drop_core_fn_method_irohinstance_receive_files(`ptr`: Pointer,`ticket`: RustBuffer.ByValue,`handleChunk`: Pointer,
     ): Long
     fun uniffi_drop_core_fn_method_irohinstance_send_files(`ptr`: Pointer,`files`: RustBuffer.ByValue,
     ): Long
@@ -871,7 +871,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun uniffi_drop_core_checksum_method_irohinstance_get_node(
     ): Short
-    fun uniffi_drop_core_checksum_method_irohinstance_recieve_files(
+    fun uniffi_drop_core_checksum_method_irohinstance_receive_files(
     ): Short
     fun uniffi_drop_core_checksum_method_irohinstance_send_files(
     ): Short
@@ -897,7 +897,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_drop_core_checksum_method_irohinstance_get_node() != 32150.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_drop_core_checksum_method_irohinstance_recieve_files() != 48969.toShort()) {
+    if (lib.uniffi_drop_core_checksum_method_irohinstance_receive_files() != 48969.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_drop_core_checksum_method_irohinstance_send_files() != 33734.toShort()) {
@@ -1658,7 +1658,7 @@ public interface IrohInstanceInterface {
     
     fun `getNode`(): IrohNode
     
-    suspend fun `recieveFiles`(`ticket`: kotlin.String, `handleChunk`: FileTransferHandle): DropCollection
+    suspend fun `receiveFiles`(`ticket`: kotlin.String, `handleChunk`: FileTransferHandle): DropCollection
     
     suspend fun `sendFiles`(`files`: List<PathBuf>): BlobTicket
     
@@ -1762,10 +1762,10 @@ open class IrohInstance: Disposable, AutoCloseable, IrohInstanceInterface {
     
     @Throws(IrohException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `recieveFiles`(`ticket`: kotlin.String, `handleChunk`: FileTransferHandle) : DropCollection {
+    override suspend fun `receiveFiles`(`ticket`: kotlin.String, `handleChunk`: FileTransferHandle) : DropCollection {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_drop_core_fn_method_irohinstance_recieve_files(
+            UniffiLib.INSTANCE.uniffi_drop_core_fn_method_irohinstance_receive_files(
                 thisPtr,
                 FfiConverterString.lower(`ticket`),FfiConverterTypeFileTransferHandle.lower(`handleChunk`),
             )

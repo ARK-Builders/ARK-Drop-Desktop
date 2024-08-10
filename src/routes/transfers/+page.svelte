@@ -65,7 +65,7 @@
 		>
 		<Button
 			on:click={() => {
-				goto(`/transfers/recieve`);
+				goto(`/transfers/receive`);
 			}}
 			class="w-32"
 		>

@@ -20,7 +20,7 @@
 
 	onMount(async () => {
 		let start = Date.now();
-		output = await invoke('recieve_files', {
+		output = await invoke('receive_files', {
 			ticket: data.ticket
 		});
 		time_complete = Date.now() - start;

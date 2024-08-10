@@ -42,7 +42,7 @@
 					qrScanner = new QrScanner(
 						videoSource,
 						(result) => {
-							goto('/transfers/recieve/confirm?hash=' + result.data);
+							goto('/transfers/receive/confirm?hash=' + result.data);
 						},
 						{
 							highlightCodeOutline: true,
