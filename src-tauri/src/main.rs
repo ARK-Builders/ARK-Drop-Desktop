@@ -134,7 +134,7 @@ async fn receive_files(
 
     let files = state
         .iroh
-        .recieve_files(ticket, Arc::new(FileTransferHandle(tx)))
+        .receive_files(ticket, Arc::new(FileTransferHandle(tx)))
         .await
         .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
 

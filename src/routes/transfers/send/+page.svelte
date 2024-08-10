@@ -36,7 +36,7 @@
 	</button>
 	<button
 		on:click={() => {
-			goto('/transfers/recieve');
+			goto('/transfers/receive');
 		}}
 		class="flex flex-row items-center gap-2"
 	>
