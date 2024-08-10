@@ -255,6 +255,7 @@ impl IrohInstance {
 
         // If we reach this point, the download stream has ended without completing the download
         let collection = self.node.0.blobs().get_collection(ticket.hash()).await?;
+        
         Ok(collection.into())
     }
 }

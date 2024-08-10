@@ -5,7 +5,6 @@ use anyhow::{anyhow, Result};
 use drop_core::IrohInstance;
 use drop_core::{FileTransfer, FileTransferHandle};
 use iroh_base::ticket::BlobTicket;
-use iroh_blobs::format::collection::Collection;
 use iroh_blobs::BlobFormat;
 use std::sync::Arc;
 use std::{path::PathBuf, str::FromStr, vec};
@@ -72,7 +71,8 @@ fn main() {
             generate_ticket,
             recieve_files,
             open_directory,
-            is_valid_ticket
+            is_valid_ticket,
+            get_env
         ])
         .run(generate_context!())
         .expect("error while running tauri application");
@@ -96,6 +96,11 @@ fn event_handler<R: tauri::Runtime>(message: Event, manager: &impl Manager<R>) {
             manager.emit_all("download_progress", &progress).unwrap();
         }
     }
+}
+
+#[tauri::command]
+fn get_env(key: &str) -> String {
+    std::env::var(String::from(key)).unwrap_or(String::from(""))
 }
 
 #[tauri::command]
@@ -144,18 +149,8 @@ async fn recieve_files(
 
     let outpath = dirs::download_dir().unwrap();
 
-    export_collection(&state.iroh, files.0, &outpath).await?;
-
-    Ok(outpath)
-}
-
-pub async fn export_collection(
-    iroh: &IrohInstance,
-    collection: Collection,
-    outpath: &PathBuf,
-) -> Result<(), InvokeError> {
-    for (name, hash) in collection.iter() {
-        let content = iroh
+    for (name, hash) in files.0.iter() {
+        let content = state.iroh
             .get_node()
             .0
             .blobs()
@@ -166,7 +161,7 @@ pub async fn export_collection(
         let _ = std::fs::write(&file_path, content);
     }
 
-    Ok(())
+    Ok(outpath)
 }
 
 #[tauri::command]
