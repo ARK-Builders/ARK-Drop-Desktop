@@ -80,10 +80,10 @@
 	<textarea class="w-full p-2 rounded-lg" rows="3" bind:value={devHash}></textarea>
 	<button
 		on:click={() => {
-			goto('/transfers/recieve/confirm?hash=' + devHash);
+			goto('/transfers/receive/confirm?hash=' + devHash);
 		}}
 		class="w-full bg-blue-500 text-white rounded-md py-2 mt-2"
-	>Recieve</button>
+	>Receive</button>
 </div>
 {/if}
 

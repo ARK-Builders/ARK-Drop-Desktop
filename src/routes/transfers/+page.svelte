@@ -70,7 +70,7 @@
 			class="w-32"
 		>
 			<ArrowCircleBrokenDown class="h-5 w-5 stroke-primary-fg" /><span
-				class="text-[16px] font-semibold text-primary-fg">Recieve</span
+				class="text-[16px] font-semibold text-primary-fg">Receive</span
 			></Button
 		>
 	</div>
