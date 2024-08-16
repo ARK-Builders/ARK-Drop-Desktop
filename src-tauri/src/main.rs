@@ -144,7 +144,7 @@ async fn receive_files(
         .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
 
     for handle in handles {
-        handle.abort();
+        handle.await.unwrap();
     }
 
     let outpath = dirs::download_dir().unwrap();

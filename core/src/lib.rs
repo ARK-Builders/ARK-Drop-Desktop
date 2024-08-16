@@ -173,6 +173,7 @@ impl IrohInstance {
         // we can send these events to the client to update the progress
         while let Some(event) = download_stream.next().await {
             let event = event.map_err(|e| IrohError::DownloadError(e.to_string()))?;
+
             match event {
                 DownloadProgress::FoundHashSeq { hash, .. } => {
                     let hashseq = self
@@ -275,9 +276,8 @@ impl IrohInstance {
                         } else {
                             return Err(IrohError::Unreachable(file!().to_string(), line!().to_string()));
                         }
-                    } else {
-                        return Err(IrohError::Unreachable(file!().to_string(), line!().to_string()));
                     }
+                    // If we don't have metadata, it means it hasn't been found yet
                 }
 
                 DownloadProgress::Progress { id, offset } => {

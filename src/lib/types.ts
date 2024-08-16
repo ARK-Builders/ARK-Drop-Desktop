@@ -5,6 +5,6 @@ export type FileUploaded = FileTransfer & {
 
 export type FileTransfer = {
 	name: string;
-	transfered: number;
+	transferred: number;
 	total: number;
 };

@@ -16,17 +16,15 @@
 	let timeLeft = 0; // seconds
 
 	onMount(() => {
-		const interval = setInterval(() => {
-			if (previousFile.transfered !== file.transfered) {
-				internetSpeed = file.transfered - previousFile.transfered;
-				timeLeft = (file.total - file.transfered) / internetSpeed;
+		const updateTransfer = () => {
+			if (previousFile.transferred !== file.transferred) {
+				internetSpeed = file.transferred - previousFile.transferred;
+				timeLeft = (file.total - file.transferred) / internetSpeed;
 				previousFile = file;
 			}
-		}, 1000);
-
-		return () => {
-			clearInterval(interval);
-		};
+			requestAnimationFrame(updateTransfer);
+		}
+		requestAnimationFrame(updateTransfer);
 	});
 
 	function percentComplete(done: number, all: number) {
@@ -36,10 +34,11 @@
 	const dispatch = createEventDispatcher();
 
 	let openModal = false;
+
 </script>
 
-{#if file.transfered < file.total}
-	<div class="flex w-full flex-col gap-3 rounded-2xl border-1 p-3">
+{#if file.transferred < file.total}
+<div class="flex w-full flex-col gap-3 rounded-2xl border-1 p-3">
 		<div class="flex flex-row items-center gap-3">
 			<div class="h-11 w-11 rounded-full border-1 p-[10px]">
 				<FileType />
@@ -47,7 +46,7 @@
 			<div class="flex flex-1 flex-col justify-between py-1">
 				<span class="text-sm font-medium text-gray-modern-900">{file.name}</span>
 				<p class="flex flex-row items-center gap-1 text-xs text-gray-modern-500">
-					{formatBytes(file.transfered)} of {formatBytes(file.total)}
+					{formatBytes(file.transferred)} of {formatBytes(file.total)}
 					<svg
 						class="fill-gray-modern-500"
 						width="4"
@@ -72,10 +71,10 @@
 			</button> -->
 		</div>
 
-		{#if file.transfered < file.total}
+		{#if file.transferred < file.total}
 			<div class="relative h-[6px] w-full rounded-full bg-gray-modern-300">
 				<div
-					style={`--percent-complete: ${100 - percentComplete(file.transfered, file.total)}%`}
+					style={`--percent-complete: ${100 - percentComplete(file.transferred, file.total)}%`}
 					class={`absolute left-0 right-[var(--percent-complete)] h-full rounded-full bg-blue-dark-500`}
 				></div>
 			</div>
