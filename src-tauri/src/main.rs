@@ -34,7 +34,7 @@ async fn setup<R: tauri::Runtime>(
     handle: &tauri::AppHandle<R>,
     async_proc_input_tx: mpsc::Sender<Event>,
 ) -> Result<()> {
-    let iroh = IrohInstance::new().await?;
+    let iroh = IrohInstance::new().await.map_err(|e| anyhow!(e))?;
 
     handle.manage(AppState::new(iroh, async_proc_input_tx));
 
@@ -158,7 +158,7 @@ async fn receive_files(
             .await
             .map_err(|e| InvokeError::from_anyhow(anyhow!("failed to read blob: {}", e)))?;
         let file_path = outpath.join(name);
-        let _ = std::fs::write(&file_path, content);
+        std::fs::write(&file_path, content).map_err(|e| InvokeError::from_anyhow(anyhow!("failed to write file: {}", e)))?;
     }
 
     Ok(outpath)

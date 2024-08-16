@@ -1,8 +1,6 @@
 pub mod erorr;
 pub mod metadata;
 
-use anyhow::Context;
-
 use erorr::{IrohError, IrohResult};
 use futures_buffered::try_join_all;
 use futures_lite::stream::StreamExt;
@@ -86,7 +84,10 @@ pub struct FileTransferHandle(pub Sender<Vec<FileTransfer>>);
 impl IrohInstance {
     #[uniffi::constructor]
     pub async fn new() -> IrohResult<Self> {
-        let node = Node::memory().spawn().await?;
+        let node = Node::memory()
+            .spawn()
+            .await
+            .map_err(|e| IrohError::NodeError(e.to_string()))?;
         Ok(Self {
             node: Arc::new(IrohNode(node)),
         })
@@ -126,7 +127,8 @@ impl IrohInstance {
             .0
             .blobs()
             .create_collection(collection, SetTagOption::Auto, Default::default())
-            .await?;
+            .await
+            .map_err(|e| IrohError::NodeError(e.to_string()))?;
 
         // We can now generate a ticket from this collection
         self.node
@@ -134,7 +136,7 @@ impl IrohInstance {
             .blobs()
             .share(hash, BlobFormat::HashSeq, Default::default())
             .await
-            .map_err(|e| e.into())
+            .map_err(|e| IrohError::NodeError(e.to_string()))
     }
 
     /// Accepts a `BlobTicket` and a `FileTransferHandle`
@@ -146,10 +148,10 @@ impl IrohInstance {
         ticket: String,
         handle_chunk: Arc<FileTransferHandle>,
     ) -> IrohResult<DropCollection> {
-        let ticket = BlobTicket::from_str(&ticket)?;
+        let ticket = BlobTicket::from_str(&ticket).map_err(|_| IrohError::InvalidTicket)?;
 
         if ticket.format() != BlobFormat::HashSeq {
-            return Err(IrohError::UnsupportedFormat(ticket.format()));
+            return Err(IrohError::UnsupportedFormat);
         }
 
         // Download the collection from the node
@@ -158,7 +160,8 @@ impl IrohInstance {
             .0
             .blobs()
             .download_hash_seq(ticket.hash(), ticket.node_addr().clone())
-            .await?;
+            .await
+            .map_err(|e| IrohError::DownloadError(e.to_string()))?;
 
         let mut curr_metadata: Option<CollectionMetadata> = None;
         let mut curr_hashseq: Option<HashSeq> = None;
@@ -169,32 +172,62 @@ impl IrohInstance {
         // the download stream is a stream of download progress events
         // we can send these events to the client to update the progress
         while let Some(event) = download_stream.next().await {
-            let event = event?;
+            let event = event.map_err(|e| IrohError::DownloadError(e.to_string()))?;
             match event {
                 DownloadProgress::FoundHashSeq { hash, .. } => {
-                    let hashseq = self.node.0.blobs().read_to_bytes(hash).await?;
-                    let hashseq = HashSeq::try_from(hashseq)?;
+                    let hashseq = self
+                        .node
+                        .0
+                        .blobs()
+                        .read_to_bytes(hash)
+                        .await
+                        .map_err(|e| IrohError::DownloadError(e.to_string()))?;
+                    let hashseq = HashSeq::try_from(hashseq)
+                        .map_err(|e| IrohError::InvalidMetadata(e.to_string()))?;
 
-                    let metadata_hash = hashseq.iter().next().context("No metadata hash found")?;
-                    let metadata_bytes = self.node.0.blobs().read_to_bytes(metadata_hash).await?;
+                    let metadata_hash = hashseq
+                        .iter()
+                        .next()
+                        .ok_or(IrohError::InvalidMetadata("hashseq is empty".to_string()))?;
+                    let metadata_bytes = self
+                        .node
+                        .0
+                        .blobs()
+                        .read_to_bytes(metadata_hash)
+                        .await
+                        .map_err(|e| IrohError::DownloadError(e.to_string()))?;
 
                     let metadata: CollectionMetadata = postcard::from_bytes(&metadata_bytes)
-                        .context("Failed to parse metadata")?;
+                        .map_err(|e| IrohError::InvalidMetadata(e.to_string()))?;
 
                     // The hash sequence should have one more element than the metadata
                     // because the first element is the metadata itself
                     if metadata.names.len() + 1 != hashseq.len() {
-                        return Err(anyhow::anyhow!("names and links length mismatch").into());
+                        return Err(IrohError::InvalidMetadata(
+                            "metadata does not match hashseq".to_string(),
+                        ));
                     }
                     curr_hashseq = Some(hashseq);
                     curr_metadata = Some(metadata);
                 }
 
                 DownloadProgress::AllDone(_) => {
-                    let collection = self.node.0.blobs().get_collection(ticket.hash()).await?;
+                    let collection = self
+                        .node
+                        .0
+                        .blobs()
+                        .get_collection(ticket.hash())
+                        .await
+                        .map_err(|e| IrohError::DownloadError(e.to_string()))?;
                     files = vec![];
                     for (name, hash) in collection.iter() {
-                        let content = self.node.0.blobs().read_to_bytes(*hash).await?;
+                        let content = self
+                            .node
+                            .0
+                            .blobs()
+                            .read_to_bytes(*hash)
+                            .await
+                            .map_err(|e| IrohError::DownloadError(e.to_string()))?;
                         files.push({
                             FileTransfer {
                                 name: name.clone(),
@@ -203,7 +236,10 @@ impl IrohInstance {
                             }
                         })
                     }
-                    handle_chunk.0.send(files.clone())?;
+                    handle_chunk
+                        .0
+                        .send(files.clone())
+                        .map_err(|_| IrohError::SendError)?;
                     return Ok(collection.into());
                 }
 
@@ -213,7 +249,10 @@ impl IrohInstance {
                             file.transferred = file.total;
                         }
                     }
-                    handle_chunk.0.send(files.clone())?;
+                    handle_chunk
+                        .0
+                        .send(files.clone())
+                        .map_err(|_| IrohError::SendError)?;
                 }
 
                 DownloadProgress::Found { id, hash, size, .. } => {
@@ -226,7 +265,10 @@ impl IrohInstance {
                                         transferred: 0,
                                         total: size,
                                     });
-                                    handle_chunk.0.send(files.clone())?;
+                                    handle_chunk
+                                        .0
+                                        .send(files.clone())
+                                        .map_err(|_| IrohError::SendError)?;
                                     map.insert(id, name.clone());
                                 }
                             }
@@ -240,7 +282,10 @@ impl IrohInstance {
                             file.transferred = offset;
                         }
                     }
-                    handle_chunk.0.send(files.clone())?;
+                    handle_chunk
+                        .0
+                        .send(files.clone())
+                        .map_err(|_| IrohError::SendError)?;
                 }
 
                 DownloadProgress::FoundLocal { hash, size, .. } => {
@@ -253,7 +298,10 @@ impl IrohInstance {
                                     {
                                         file.transferred = size.value();
                                         file.total = size.value();
-                                        handle_chunk.0.send(files.clone())?;
+                                        handle_chunk
+                                            .0
+                                            .send(files.clone())
+                                            .map_err(|_| IrohError::SendError)?;
                                     }
                                 }
                             }
@@ -266,8 +314,14 @@ impl IrohInstance {
         }
 
         // If we reach this point, the download stream has ended without completing the download
-        let collection = self.node.0.blobs().get_collection(ticket.hash()).await?;
-        
+        let collection = self
+            .node
+            .0
+            .blobs()
+            .get_collection(ticket.hash())
+            .await
+            .map_err(|e| IrohError::DownloadError(e.to_string()))?;
+
         Ok(collection.into())
     }
 }
@@ -290,10 +344,10 @@ pub async fn import_blobs<'a>(
                 if let Ok(progress) = outcome {
                     Ok((path.clone(), progress))
                 } else {
-                    Err(outcome.err().unwrap().into())
+                    Err(IrohError::NodeError("Failed to import blob".to_string()))
                 }
             }
-            Err(e) => Err(e.into()),
+            Err(e) => Err(IrohError::NodeError(e.to_string())),
         }
     });
 

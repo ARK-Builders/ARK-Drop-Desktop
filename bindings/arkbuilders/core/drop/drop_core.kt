@@ -897,10 +897,10 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_drop_core_checksum_method_irohinstance_get_node() != 32150.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_drop_core_checksum_method_irohinstance_receive_files() != 48969.toShort()) {
+    if (lib.uniffi_drop_core_checksum_method_irohinstance_receive_files() != 48208.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_drop_core_checksum_method_irohinstance_send_files() != 33734.toShort()) {
+    if (lib.uniffi_drop_core_checksum_method_irohinstance_send_files() != 32335.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_drop_core_checksum_constructor_irohinstance_new() != 5702.toShort()) {
@@ -1658,8 +1658,20 @@ public interface IrohInstanceInterface {
     
     fun `getNode`(): IrohNode
     
+    /**
+     * Accepts a `BlobTicket` and a `FileTransferHandle`
+     * (a channel to send progress updates to the client)
+     *
+     * Returns a `DropCollection` (a wrapper around a collection).
+     */
     suspend fun `receiveFiles`(`ticket`: kotlin.String, `handleChunk`: FileTransferHandle): DropCollection
     
+    /**
+     * Accepts a list of file paths.
+     *
+     * Returns a `BlobTicket`, which is a string that
+     * can be used to retrieve the files from another node.
+     */
     suspend fun `sendFiles`(`files`: List<PathBuf>): BlobTicket
     
     companion object
@@ -1760,6 +1772,12 @@ open class IrohInstance: Disposable, AutoCloseable, IrohInstanceInterface {
     
 
     
+    /**
+     * Accepts a `BlobTicket` and a `FileTransferHandle`
+     * (a channel to send progress updates to the client)
+     *
+     * Returns a `DropCollection` (a wrapper around a collection).
+     */
     @Throws(IrohException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `receiveFiles`(`ticket`: kotlin.String, `handleChunk`: FileTransferHandle) : DropCollection {
@@ -1781,6 +1799,12 @@ open class IrohInstance: Disposable, AutoCloseable, IrohInstanceInterface {
     }
 
     
+    /**
+     * Accepts a list of file paths.
+     *
+     * Returns a `BlobTicket`, which is a string that
+     * can be used to retrieve the files from another node.
+     */
     @Throws(IrohException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `sendFiles`(`files`: List<PathBuf>) : BlobTicket {
@@ -2056,7 +2080,7 @@ public object FfiConverterTypeIrohNode: FfiConverter<IrohNode, Pointer> {
 
 data class FileTransfer (
     var `name`: kotlin.String, 
-    var `transfered`: kotlin.ULong, 
+    var `transferred`: kotlin.ULong, 
     var `total`: kotlin.ULong
 ) {
     
@@ -2074,13 +2098,13 @@ public object FfiConverterTypeFileTransfer: FfiConverterRustBuffer<FileTransfer>
 
     override fun allocationSize(value: FileTransfer) = (
             FfiConverterString.allocationSize(value.`name`) +
-            FfiConverterULong.allocationSize(value.`transfered`) +
+            FfiConverterULong.allocationSize(value.`transferred`) +
             FfiConverterULong.allocationSize(value.`total`)
     )
 
     override fun write(value: FileTransfer, buf: ByteBuffer) {
             FfiConverterString.write(value.`name`, buf)
-            FfiConverterULong.write(value.`transfered`, buf)
+            FfiConverterULong.write(value.`transferred`, buf)
             FfiConverterULong.write(value.`total`, buf)
     }
 }
@@ -2091,42 +2115,52 @@ public object FfiConverterTypeFileTransfer: FfiConverterRustBuffer<FileTransfer>
 
 sealed class IrohException: kotlin.Exception() {
     
-    class Anyhow(
+    class NodeException(
         
-        val v1: AnyhowError
+        val v1: kotlin.String
         ) : IrohException() {
         override val message
             get() = "v1=${ v1 }"
     }
     
-    class InvalidTicket(
+    class DownloadException(
         
-        val v1: IrohBaseError
+        val v1: kotlin.String
         ) : IrohException() {
         override val message
             get() = "v1=${ v1 }"
     }
     
     class InvalidMetadata(
+        
+        val v1: kotlin.String
+        ) : IrohException() {
+        override val message
+            get() = "v1=${ v1 }"
+    }
+    
+    class InvalidTicket(
         ) : IrohException() {
         override val message
             get() = ""
     }
     
     class UnsupportedFormat(
-        
-        val v1: BlobFormat
         ) : IrohException() {
         override val message
-            get() = "v1=${ v1 }"
+            get() = ""
     }
     
     class SendException(
-        
-        val v1: SendFileError
         ) : IrohException() {
         override val message
-            get() = "v1=${ v1 }"
+            get() = ""
+    }
+    
+    class Unknown(
+        ) : IrohException() {
+        override val message
+            get() = ""
     }
     
 
@@ -2142,76 +2176,90 @@ public object FfiConverterTypeIrohError : FfiConverterRustBuffer<IrohException> 
         
 
         return when(buf.getInt()) {
-            1 -> IrohException.Anyhow(
-                FfiConverterTypeAnyhowError.read(buf),
+            1 -> IrohException.NodeException(
+                FfiConverterString.read(buf),
                 )
-            2 -> IrohException.InvalidTicket(
-                FfiConverterTypeIrohBaseError.read(buf),
+            2 -> IrohException.DownloadException(
+                FfiConverterString.read(buf),
                 )
-            3 -> IrohException.InvalidMetadata()
-            4 -> IrohException.UnsupportedFormat(
-                FfiConverterTypeBlobFormat.read(buf),
+            3 -> IrohException.InvalidMetadata(
+                FfiConverterString.read(buf),
                 )
-            5 -> IrohException.SendException(
-                FfiConverterTypeSendFileError.read(buf),
-                )
+            4 -> IrohException.InvalidTicket()
+            5 -> IrohException.UnsupportedFormat()
+            6 -> IrohException.SendException()
+            7 -> IrohException.Unknown()
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
         }
     }
 
     override fun allocationSize(value: IrohException): ULong {
         return when(value) {
-            is IrohException.Anyhow -> (
+            is IrohException.NodeException -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
-                + FfiConverterTypeAnyhowError.allocationSize(value.v1)
+                + FfiConverterString.allocationSize(value.v1)
             )
-            is IrohException.InvalidTicket -> (
+            is IrohException.DownloadException -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
-                + FfiConverterTypeIrohBaseError.allocationSize(value.v1)
+                + FfiConverterString.allocationSize(value.v1)
             )
             is IrohException.InvalidMetadata -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.v1)
+            )
+            is IrohException.InvalidTicket -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
             )
             is IrohException.UnsupportedFormat -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
-                + FfiConverterTypeBlobFormat.allocationSize(value.v1)
             )
             is IrohException.SendException -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
-                + FfiConverterTypeSendFileError.allocationSize(value.v1)
+            )
+            is IrohException.Unknown -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
             )
         }
     }
 
     override fun write(value: IrohException, buf: ByteBuffer) {
         when(value) {
-            is IrohException.Anyhow -> {
+            is IrohException.NodeException -> {
                 buf.putInt(1)
-                FfiConverterTypeAnyhowError.write(value.v1, buf)
+                FfiConverterString.write(value.v1, buf)
                 Unit
             }
-            is IrohException.InvalidTicket -> {
+            is IrohException.DownloadException -> {
                 buf.putInt(2)
-                FfiConverterTypeIrohBaseError.write(value.v1, buf)
+                FfiConverterString.write(value.v1, buf)
                 Unit
             }
             is IrohException.InvalidMetadata -> {
                 buf.putInt(3)
+                FfiConverterString.write(value.v1, buf)
+                Unit
+            }
+            is IrohException.InvalidTicket -> {
+                buf.putInt(4)
                 Unit
             }
             is IrohException.UnsupportedFormat -> {
-                buf.putInt(4)
-                FfiConverterTypeBlobFormat.write(value.v1, buf)
+                buf.putInt(5)
                 Unit
             }
             is IrohException.SendException -> {
-                buf.putInt(5)
-                FfiConverterTypeSendFileError.write(value.v1, buf)
+                buf.putInt(6)
+                Unit
+            }
+            is IrohException.Unknown -> {
+                buf.putInt(7)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
@@ -2251,26 +2299,6 @@ public object FfiConverterSequenceTypePathBuf: FfiConverterRustBuffer<List<PathB
  * is needed because the UDL type name is used in function/method signatures.
  * It's also what we have an external type that references a custom type.
  */
-public typealias AnyhowError = kotlin.String
-public typealias FfiConverterTypeAnyhowError = FfiConverterString
-
-
-
-/**
- * Typealias from the type name used in the UDL file to the builtin type.  This
- * is needed because the UDL type name is used in function/method signatures.
- * It's also what we have an external type that references a custom type.
- */
-public typealias BlobFormat = kotlin.String
-public typealias FfiConverterTypeBlobFormat = FfiConverterString
-
-
-
-/**
- * Typealias from the type name used in the UDL file to the builtin type.  This
- * is needed because the UDL type name is used in function/method signatures.
- * It's also what we have an external type that references a custom type.
- */
 public typealias BlobTicket = kotlin.String
 public typealias FfiConverterTypeBlobTicket = FfiConverterString
 
@@ -2281,28 +2309,8 @@ public typealias FfiConverterTypeBlobTicket = FfiConverterString
  * is needed because the UDL type name is used in function/method signatures.
  * It's also what we have an external type that references a custom type.
  */
-public typealias IrohBaseError = kotlin.String
-public typealias FfiConverterTypeIrohBaseError = FfiConverterString
-
-
-
-/**
- * Typealias from the type name used in the UDL file to the builtin type.  This
- * is needed because the UDL type name is used in function/method signatures.
- * It's also what we have an external type that references a custom type.
- */
 public typealias PathBuf = kotlin.String
 public typealias FfiConverterTypePathBuf = FfiConverterString
-
-
-
-/**
- * Typealias from the type name used in the UDL file to the builtin type.  This
- * is needed because the UDL type name is used in function/method signatures.
- * It's also what we have an external type that references a custom type.
- */
-public typealias SendFileError = kotlin.String
-public typealias FfiConverterTypeSendFileError = FfiConverterString
 
 
 

@@ -16,7 +16,7 @@ tauri-build = { version = "1.5.2", features = [] }
 
 [dependencies]
 drop_core = { path = "../core" }
-tauri = { version = "1.6.7", features = ["dialog-open"] }
+tauri = { version = "1.6.7", features = [ "clipboard-all", "dialog-open"] }
 dirs = "5.0.1"
 open = "5.1.3"
 

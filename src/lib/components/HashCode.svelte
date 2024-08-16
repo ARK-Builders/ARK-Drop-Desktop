@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 	import Link03 from './icons/Link03.svelte';
+	import { writeText } from '@tauri-apps/api/clipboard';
 	export let hashCode: string | undefined;
 
 	let showTooltip = false;
 </script>
 
 <button
-	on:click={() => {
-		navigator.clipboard.writeText(hashCode ?? '');
+	on:click={async () => {
+		await writeText(hashCode ?? '');
 		showTooltip = true;
 		setTimeout(() => {
 			showTooltip = false;

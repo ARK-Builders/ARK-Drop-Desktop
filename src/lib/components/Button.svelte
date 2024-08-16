@@ -1,6 +1,7 @@
 <script lang="ts">
 	export let variant: 'primary' | 'secondary' = 'primary';
 	export let size: 'sm' | 'md' = 'md';
+	export let disabled = false;
 
 	let clazz = '';
 	export { clazz as class };
@@ -14,6 +15,7 @@
 		${size === 'sm' && 'gap-2 rounded-lg px-3 py-1 font-medium'}
 		${variant === 'secondary' && 'border-blue-dark-500 stroke-blue-dark-500 text-blue-dark-500'}
 		${variant === 'primary' && 'border-blue-dark-500 bg-blue-dark-500 stroke-white text-white'}
+		${disabled && 'opacity-50 cursor-not-allowed'}
 		${clazz}`}
 >
 	<slot></slot>
