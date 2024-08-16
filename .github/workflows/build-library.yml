@@ -22,7 +22,7 @@ jobs:
           toolchain: stable
           targets: aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
       - name: Build Library
-        run: cargo ndk -o ./target/release/jniLibs --target aarch64-linux-android --target armv7-linux-androideabi --target i686-linux-android --target x86_64-linux-android build --release
+        run: cargo ndk -o ./target/release/jniLibs --target aarch64-linux-android --target armv7-linux-androideabi --target i686-linux-android --target x86_64-linux-android build -p drop_core  --release
       - name: Generate Bindings
         run: cargo run -p uniffi-bingen generate --library ${{ matrix.platform.outputDir }}/libdrop_core.so --language=kotlin --out-dir ./target/release/bindings
       - name: Upload Library

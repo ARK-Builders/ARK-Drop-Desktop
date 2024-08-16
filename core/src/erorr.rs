@@ -9,6 +9,7 @@ pub enum IrohError {
     UnsupportedFormat,
     SendError,
     Unknown,
+    Unreachable(String,String),
 }
 
 impl std::fmt::Display for IrohError {
@@ -21,6 +22,7 @@ impl std::fmt::Display for IrohError {
             IrohError::NodeError(e) => write!(f, "Node error: {}", e),
             IrohError::DownloadError(e) => write!(f, "Download error: {}", e),
             IrohError::InvalidMetadata(e) => write!(f, "Invalid metadata: {}", e),
+            IrohError::Unreachable(file,line) => write!(f, "Unreachable code at {}:{}!", file, line),
         }
     }
 }

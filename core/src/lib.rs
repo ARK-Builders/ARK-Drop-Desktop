@@ -218,7 +218,7 @@ impl IrohInstance {
                         .blobs()
                         .get_collection(ticket.hash())
                         .await
-                        .map_err(|e| IrohError::DownloadError(e.to_string()))?;
+                        .map_err(|e: anyhow::Error| IrohError::DownloadError(e.to_string()))?;
                     files = vec![];
                     for (name, hash) in collection.iter() {
                         let content = self
@@ -272,7 +272,11 @@ impl IrohInstance {
                                     map.insert(id, name.clone());
                                 }
                             }
+                        } else {
+                            return Err(IrohError::Unreachable(file!().to_string(), line!().to_string()));
                         }
+                    } else {
+                        return Err(IrohError::Unreachable(file!().to_string(), line!().to_string()));
                     }
                 }
 
