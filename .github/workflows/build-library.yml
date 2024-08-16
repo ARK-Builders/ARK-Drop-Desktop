@@ -3,8 +3,14 @@ name: Build Library
 env:
   CARGO_TERM_COLOR: always
 
-on: push
-
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+      
 jobs:
   build-library:
     name: Build Core Library and Kotlin Bindings
