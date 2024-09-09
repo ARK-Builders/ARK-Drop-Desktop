@@ -68,7 +68,7 @@
 		</svg>
 	{/if}
 	{#if done}
-		<span class="mt-3 text-lg font-medium text-gray-modern-900">File has been sent to Bob!</span>
+		<span class="mt-3 text-lg font-medium text-gray-modern-900">Files Received</span>
 	{:else}
 		<span class="mt-3 text-lg font-medium text-gray-modern-900"
 			>Wait a moment while transfering</span

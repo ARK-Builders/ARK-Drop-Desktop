@@ -298,7 +298,7 @@ impl IrohInstance {
                             return Err(IrohError::Unreachable(file!().to_string(), line!().to_string()));
                         }
                     }
-                    // If we don't have metadata, it means it hasn't been found yet
+                    writeln!(log_file, "WARNING: Received Blob Before Metadata").expect("Failed to write to log file");
                 }
 
                 DownloadProgress::Progress { id, offset } => {
