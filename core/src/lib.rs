@@ -1,7 +1,6 @@
 pub mod erorr;
 pub mod metadata;
 
-use std::io::Write;
 use erorr::{IrohError, IrohResult};
 use futures_buffered::try_join_all;
 use futures_lite::stream::StreamExt;
@@ -16,6 +15,7 @@ use iroh_blobs::{
 };
 use metadata::CollectionMetadata;
 use serde::{Deserialize, Serialize};
+use std::io::Write;
 use std::{
     collections::BTreeMap,
     iter::Iterator,
@@ -174,12 +174,12 @@ impl IrohInstance {
         let temp_dir = std::env::temp_dir();
 
         println!("Debug log: {}", debug_log);
-        
+
         // the download stream is a stream of download progress events
         // we can send these events to the client to update the progress
         while let Some(event) = download_stream.next().await {
             let event = event.map_err(|e| IrohError::DownloadError(e.to_string()))?;
-            
+
             if debug_log {
                 let mut log_file = std::fs::OpenOptions::new()
                     .create(true)
@@ -188,7 +188,6 @@ impl IrohInstance {
                     .expect("Failed to open log file");
                 writeln!(log_file, "{:?}", event).expect("Failed to write to log file");
             }
-
 
             match event {
                 DownloadProgress::FoundHashSeq { hash, .. } => {
@@ -257,7 +256,7 @@ impl IrohInstance {
                         .0
                         .send(files.clone())
                         .map_err(|_| IrohError::SendError)?;
-                    
+
                     if debug_log {
                         println!("[DEBUG FILE]: {:?}", temp_dir.join("drop_debug.log"));
                     }
@@ -295,10 +294,20 @@ impl IrohInstance {
                                 }
                             }
                         } else {
-                            return Err(IrohError::Unreachable(file!().to_string(), line!().to_string()));
+                            return Err(IrohError::Unreachable(
+                                file!().to_string(),
+                                line!().to_string(),
+                            ));
                         }
                     }
-                    writeln!(log_file, "WARNING: Received Blob Before Metadata").expect("Failed to write to log file");
+                    if debug_log {
+                        let mut log_file = std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(temp_dir.join("drop_debug.log"))
+                            .expect("Failed to open log file");
+                        writeln!(log_file, "{:?}", event).expect("Failed to write to log file");
+                    }
                 }
 
                 DownloadProgress::Progress { id, offset } => {
