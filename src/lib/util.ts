@@ -56,3 +56,12 @@ export function getDateInterval(date: Date) {
 		}
 	}
 }
+
+export function getConfirmationCode(hash: string) {
+	return (
+		hash
+			.split('')
+			.map((char) => char.charCodeAt(0))
+			.reduce((acc, curr) => acc + curr, 0) % 100
+	);
+}

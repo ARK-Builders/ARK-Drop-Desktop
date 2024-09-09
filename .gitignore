@@ -9,3 +9,6 @@ target
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+/src-tauri/.ark-drop-data-*
+target
+.vscode

@@ -14,18 +14,16 @@
 
 		if (selected === null) {
 			return [];
-		}
-
-		if (Array.isArray(selected)) {
+		} else if (!Array.isArray(selected)) {
+			return [selected];
+		} else {
 			return selected;
 		}
-
-		return [selected];
 	};
 </script>
 
 <header
-	class="border-b-1 flex flex-row items-center justify-between border-gray-modern-200 px-4 py-5"
+	class="flex flex-row items-center justify-between border-b-1 border-gray-modern-200 px-4 py-5"
 >
 	<div class="text-gray-modern-900">
 		<h3 class="text-sm">Hi Alice,</h3>
@@ -48,13 +46,16 @@
 		<Button
 			on:click={async () => {
 				const files = await getSelectedFiles();
-				if (files.length > 0) {
-					goto(`/transfers/send`, {
-						state: {
-							files
-						}
-					});
+
+				if (files.length === 0) {
+					return;
 				}
+
+				const params = new URLSearchParams();
+				for (const file of files) {
+					params.append('file', file);
+				}
+				goto(`/transfers/send?${params.toString()}`);
 			}}
 			class="w-32"
 		>
@@ -64,12 +65,12 @@
 		>
 		<Button
 			on:click={() => {
-				goto(`/transfers/recieve`);
+				goto(`/transfers/receive`);
 			}}
 			class="w-32"
 		>
 			<ArrowCircleBrokenDown class="h-5 w-5 stroke-primary-fg" /><span
-				class="text-[16px] font-semibold text-primary-fg">Recieve</span
+				class="text-[16px] font-semibold text-primary-fg">Receive</span
 			></Button
 		>
 	</div>

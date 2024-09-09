@@ -1,0 +1,45 @@
+name: Build Library
+
+env:
+  CARGO_TERM_COLOR: always
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+      
+jobs:
+  build-library:
+    name: Build Core Library and Kotlin Bindings
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+      - name: install cargo ndk
+        run: cargo install cargo-ndk
+      - name: Add Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+      - name: Build Library
+        run: cargo ndk -o ./target/release/jniLibs --target aarch64-linux-android --target armv7-linux-androideabi --target i686-linux-android --target x86_64-linux-android build -p drop_core  --release
+      - name: Build Rust Library
+        run: cargo build -p drop_core
+      - name: Generate Bindings
+        run: cargo run -p uniffi-bingen generate --library ./target/debug/drop_core.dll --language=kotlin --out-dir ./target/release/bindings
+      - name: Upload Library
+        uses: actions/upload-artifact@v4
+        with:
+          name: ark-drop-core
+          path: ./target/release/jniLibs
+      - name: Upload Bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: ark-drop-bindings
+          path: ./target/release/bindings

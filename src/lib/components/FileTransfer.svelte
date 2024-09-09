@@ -6,13 +6,26 @@
 	import Button from './Button.svelte';
 	import { formatBytes, formatTime } from '$lib/util';
 	import FileUploaded from './FileUploaded.svelte';
+	import type { FileTransfer as FileTransferDTO } from '$lib/types';
 
-	let file = 'Img 2718. JPG';
-	let transferedSize = 1_500_000; // bytes
-	let fileSize = 4_700_000; // bytes
+	export let file: FileTransferDTO;
 
-	let internetSpeed = 1_000_000; // bytes/s
-	let timeLeft = (fileSize - transferedSize) / internetSpeed; // seconds
+	let previousFile = file;
+
+	let internetSpeed = 0; // bytes/s
+	let timeLeft = 0; // seconds
+
+	onMount(() => {
+		const updateTransfer = () => {
+			if (previousFile.transferred !== file.transferred) {
+				internetSpeed = file.transferred - previousFile.transferred;
+				timeLeft = (file.total - file.transferred) / internetSpeed;
+				previousFile = file;
+			}
+			requestAnimationFrame(updateTransfer);
+		}
+		requestAnimationFrame(updateTransfer);
+	});
 
 	function percentComplete(done: number, all: number) {
 		return Math.floor((done / all) * 100);
@@ -20,33 +33,20 @@
 
 	const dispatch = createEventDispatcher();
 
-	onMount(() => {
-		const updateSpeed = 10;
-		const interval = setInterval(() => {
-			transferedSize += internetSpeed / updateSpeed;
-			timeLeft = (fileSize - transferedSize) / internetSpeed;
-
-			if (transferedSize >= fileSize) {
-				clearInterval(interval);
-				dispatch('done');
-			}
-		}, 1000 / updateSpeed);
-		return () => clearInterval(interval);
-	});
-
 	let openModal = false;
+
 </script>
 
-{#if transferedSize < fileSize}
-	<div class="flex w-full flex-col gap-3 rounded-2xl border-1 p-3">
+{#if file.transferred < file.total}
+<div class="flex w-full flex-col gap-3 rounded-2xl border-1 p-3">
 		<div class="flex flex-row items-center gap-3">
 			<div class="h-11 w-11 rounded-full border-1 p-[10px]">
 				<FileType />
 			</div>
 			<div class="flex flex-1 flex-col justify-between py-1">
-				<span class="text-sm font-medium text-gray-modern-900">{file}</span>
+				<span class="text-sm font-medium text-gray-modern-900">{file.name}</span>
 				<p class="flex flex-row items-center gap-1 text-xs text-gray-modern-500">
-					{formatBytes(transferedSize)} of {formatBytes(fileSize)}
+					{formatBytes(file.transferred)} of {formatBytes(file.total)}
 					<svg
 						class="fill-gray-modern-500"
 						width="4"
@@ -60,20 +60,21 @@
 					{formatTime(timeLeft)} left
 				</p>
 			</div>
-			<button
+			<!-- cancel button -->
+			<!-- <button
 				on:click={() => {
 					openModal = true;
 				}}
 				class="h-6 w-6"
 			>
 				<XClose class="stroke-blue-dark-500" />
-			</button>
+			</button> -->
 		</div>
 
-		{#if transferedSize < fileSize}
+		{#if file.transferred < file.total}
 			<div class="relative h-[6px] w-full rounded-full bg-gray-modern-300">
 				<div
-					style={`--percent-complete: ${100 - percentComplete(transferedSize, fileSize)}%`}
+					style={`--percent-complete: ${100 - percentComplete(file.transferred, file.total)}%`}
 					class={`absolute left-0 right-[var(--percent-complete)] h-full rounded-full bg-blue-dark-500`}
 				></div>
 			</div>
@@ -82,8 +83,7 @@
 {:else}
 	<FileUploaded
 		fileUploaded={{
-			fileName: file,
-			fileSize: fileSize,
+			...file,
 			recipient: 'Aurora',
 			sentAt: new Date()
 		}}
@@ -107,9 +107,9 @@
 					<FileType />
 				</div>
 				<div class="flex flex-1 flex-col justify-between py-1">
-					<span class="text-sm font-medium text-gray-modern-900">{file}</span>
+					<span class="text-sm font-medium text-gray-modern-900">{file.name}</span>
 					<p class="flex flex-row items-center gap-1 text-xs text-gray-modern-500">
-						{formatBytes(fileSize)}
+						{formatBytes(file.total)}
 					</p>
 				</div>
 			</div>

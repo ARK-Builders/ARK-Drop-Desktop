@@ -2,25 +2,24 @@
 	import QrCode from 'qrcode';
 	import { onMount } from 'svelte';
 
-	export let hashCode: string;
+	export let hashCode: string | undefined;
 
 	let loading = true;
 
 	let canvas: HTMLCanvasElement;
 
-	onMount(() => {
-		if (canvas) {
-			QrCode.toCanvas(canvas, hashCode, {
-				scale: 8
+	$: if (canvas && hashCode) {
+		QrCode.toCanvas(canvas, hashCode, {
+			scale: 5
+		})
+			.then(() => {
+				loading = false;
 			})
-				.then(() => {
-					loading = false;
-				})
-				.catch((error) => {
-					console.error(error);
-				});
-		}
-	});
+			.catch((error) => {
+				loading = true;
+				console.error(error);
+			});
+	}
 </script>
 
 <div class="relative flex h-64 w-64 items-center justify-center">
