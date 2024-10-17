@@ -6,13 +6,13 @@ use drop_core::IrohInstance;
 use drop_core::{FileTransfer, FileTransferHandle};
 use iroh_base::ticket::BlobTicket;
 use iroh_blobs::BlobFormat;
+use tauri::path::PathResolver;
 use std::sync::Arc;
 use std::{path::PathBuf, str::FromStr, vec};
 use tauri::ipc::InvokeError;
 use tauri::{generate_context, generate_handler, AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
-
 struct AppState {
     pub iroh: IrohInstance,
     inner: Mutex<mpsc::Sender<Event>>,
@@ -48,7 +48,6 @@ pub fn run() {
     let (async_proc_output_tx, mut async_proc_output_rx) = mpsc::channel(1);
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_barcode_scanner::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -152,7 +151,11 @@ async fn receive_files(
         handle.await.unwrap();
     }
 
-    let outpath = dirs::download_dir().unwrap();
+    let outpath = if let Some(path) = dirs::download_dir() {
+        path
+    } else {
+        PathBuf::from(".")
+    };
 
     for (name, hash) in files.0.iter() {
         let content = state

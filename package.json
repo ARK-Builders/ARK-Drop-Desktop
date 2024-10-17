@@ -41,10 +41,9 @@
 	"type": "module",
 	"dependencies": {
 		"@tauri-apps/api": "^2.0.0",
-		"@tauri-apps/plugin-barcode-scanner": "^2.0.0",
 		"@tauri-apps/plugin-clipboard-manager": "^2.0.0",
 		"@tauri-apps/plugin-dialog": "^2.0.0",
-		"qr-scanner": "^1.4.2",
+		"html5-qrcode": "^2.3.8",
 		"qrcode": "^1.5.3"
 	}
 }

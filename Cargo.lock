@@ -207,7 +207,6 @@ dependencies = [
  "open",
  "tauri",
  "tauri-build",
- "tauri-plugin-barcode-scanner",
  "tauri-plugin-clipboard-manager",
  "tauri-plugin-dialog",
  "tokio",
@@ -7087,20 +7086,6 @@ dependencies = [
  "tauri-utils",
  "toml 0.8.2",
  "walkdir",
-]
-
-[[package]]
-name = "tauri-plugin-barcode-scanner"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39f402f82bd274a113a5063ab6f24e8a978b5eee9aad26a9e17c1b2772e8022c"
-dependencies = [
- "log",
- "serde",
- "serde_json",
- "tauri",
- "tauri-plugin",
- "thiserror",
 ]
 
 [[package]]
