@@ -8,7 +8,7 @@ name = "drop_core"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
-iroh = { workspace = true }
+iroh = { workspace = true }  
 iroh-blobs = { workspace = true }
 iroh-base = { workspace = true }
 iroh-net = { workspace = true }

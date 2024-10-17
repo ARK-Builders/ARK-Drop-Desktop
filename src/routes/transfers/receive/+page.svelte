@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { scan, Format } from '@tauri-apps/plugin-barcode-scanner';
 	import { goto } from '$app/navigation';
 	import ChevronLeft from '$lib/components/icons/ChevronLeft.svelte';
 	import { onMount } from 'svelte';
 	import QrScanner from 'qr-scanner';
-	import { invoke } from '@tauri-apps/api';
+	import { invoke } from '@tauri-apps/api/core';
 	import ChevronUp from '$lib/components/icons/ChevronUp.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import XClose from '$lib/components/icons/XClose.svelte';
@@ -19,45 +20,7 @@
 	let openModal = false;
 
 	onMount(() => {
-		navigator.permissions.query({ name: 'camera' as PermissionName }).then((permission) => {
-			if (permission.state === 'denied') {
-				goto('/transfers');
-			}
-
-			loading = true;
-
-			navigator.mediaDevices
-				.getUserMedia({
-					audio: false,
-					video: true
-				})
-				.then((stream) => {
-					if (!videoSource) return;
-
-					videoSource.srcObject = stream;
-					videoSource.play();
-					loading = false;
-
-					qrScanner = new QrScanner(
-						videoSource,
-						(result) => {
-							goto('/transfers/receive/confirm?hash=' + result.data);
-						},
-						{
-							highlightCodeOutline: true,
-							highlightScanRegion: true
-						}
-					);
-
-					qrScanner.start();
-				});
-		});
-
-		return () => {
-			if (qrScanner) {
-				qrScanner.stop();
-			}
-		};
+		scan({ windowed: true, formats: [Format.QRCode] });
 	});
 </script>
 
