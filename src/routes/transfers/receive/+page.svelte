@@ -8,7 +8,7 @@
 	import Button from '$lib/components/Button.svelte';
 	import XClose from '$lib/components/icons/XClose.svelte';
 	import Clipboard from '$lib/components/icons/Clipboard.svelte';
-	import { readText } from '@tauri-apps/api/clipboard';
+	import { readText } from '@tauri-apps/plugin-clipboard-manager';
 
 	let videoSource: HTMLVideoElement | null = null;
 	let loading = false;

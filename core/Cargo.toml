@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "drop_core"
-crate-type = ["cdylib", "lib"]
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
 iroh = { workspace = true }
