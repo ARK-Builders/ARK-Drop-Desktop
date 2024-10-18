@@ -205,6 +205,8 @@ dependencies = [
  "iroh-base",
  "iroh-blobs",
  "open",
+ "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-clipboard-manager",

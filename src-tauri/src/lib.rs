@@ -6,7 +6,6 @@ use drop_core::IrohInstance;
 use drop_core::{FileTransfer, FileTransferHandle};
 use iroh_base::ticket::BlobTicket;
 use iroh_blobs::BlobFormat;
-use tauri::path::PathResolver;
 use std::sync::Arc;
 use std::{path::PathBuf, str::FromStr, vec};
 use tauri::ipc::InvokeError;
