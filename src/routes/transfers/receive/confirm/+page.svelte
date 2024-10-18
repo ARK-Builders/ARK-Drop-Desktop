@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import Code from '$lib/components/Code.svelte';
 	import ChevronLeft from '$lib/components/icons/ChevronLeft.svelte';
-	import { invoke } from '@tauri-apps/api';
+	import { invoke } from '@tauri-apps/api/core';
 
 	export let data;
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 	import Link03 from './icons/Link03.svelte';
-	import { writeText } from '@tauri-apps/api/clipboard';
+	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	export let hashCode: string | undefined;
 
 	let showTooltip = false;

@@ -5,7 +5,7 @@
 	import Button from '$lib/components/Button.svelte';
 	import PlusCircle from '$lib/components/icons/PlusCircle.svelte';
 	import { onMount } from 'svelte';
-	import { invoke } from '@tauri-apps/api';
+	import { invoke } from '@tauri-apps/api/core';
 	import { formatTime } from '$lib/util.js';
 	import { listen } from '@tauri-apps/api/event';
 	import type { FileTransfer as FileTransferDTO } from '$lib/types';
