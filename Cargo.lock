@@ -178,6 +178,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dirs",
+ "drop_core",
  "iroh-base",
  "iroh-blobs",
  "open",
