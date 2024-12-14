@@ -153,7 +153,8 @@ async fn receive_files(
     let outpath = if let Some(path) = dirs::download_dir() {
         path
     } else {
-        PathBuf::from(".")
+        // Android download path
+        PathBuf::from("/storage/emulated/0/Download/")
     };
 
     for (name, hash) in files.0.iter() {
