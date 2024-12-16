@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ark-drop-desktop",
+  "productName": "ark-drop",
   "version": "0.1.0",
   "identifier": "com.arkdrop.desktop",
   "build": {
