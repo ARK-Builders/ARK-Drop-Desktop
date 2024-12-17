@@ -27,7 +27,7 @@
 		"@sveltejs/adapter-static": "^3.0.1",
 		"@sveltejs/kit": "^2.5.10",
 		"@sveltejs/vite-plugin-svelte": "^3.1.0",
-		"@tauri-apps/cli": "^1.5.14",
+		"@tauri-apps/cli": "^2.0.3",
 		"@types/eslint": "^8.56.10",
 		"@types/qrcode": "^1.5.5",
 		"@typescript-eslint/eslint-plugin": "^7.11.0",
