@@ -25,7 +25,7 @@
 		<span class="text-center text-lg font-medium text-gray-modern-900">Can't connect to {name}</span
 		>
 		<span class="text-center text-sm text-gray-modern-500"
-			>please make sure code confirmation are matched</span
+			>Please make sure the confirmation code is correct</span
 		>
 	</div>
 	<button

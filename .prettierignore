@@ -1,4 +1,11 @@
-# Ignore files for PNPM, NPM and YARN
+.env*
+build
+target
+package
+.vscode
+.DS_Store
+.svelte-kit
+node_modules
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
