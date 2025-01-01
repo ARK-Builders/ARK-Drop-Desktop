@@ -2,12 +2,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use anyhow::{anyhow, Result};
+use drop_core::metadata::FileTransfer;
 use drop_core::IrohInstance;
-use drop_core::{FileTransfer, FileTransferHandle};
-use iroh_base::ticket::BlobTicket;
+use iroh_blobs::ticket::BlobTicket;
 use iroh_blobs::BlobFormat;
-use std::sync::Arc;
-use std::{path::PathBuf, str::FromStr, vec};
+use std::str::FromStr;
+use std::{path::PathBuf, vec};
 use tauri::ipc::InvokeError;
 use tauri::{generate_context, generate_handler, AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
@@ -110,7 +110,7 @@ fn get_env(key: &str) -> String {
 #[tauri::command]
 async fn generate_ticket(
     state: tauri::State<'_, AppState>,
-    paths: Vec<PathBuf>,
+    paths: Vec<String>,
 ) -> Result<BlobTicket, InvokeError> {
     state
         .iroh
@@ -123,7 +123,7 @@ async fn generate_ticket(
 async fn receive_files(
     state: tauri::State<'_, AppState>,
     ticket: String,
-) -> Result<PathBuf, InvokeError> {
+) -> Result<String, InvokeError> {
     let async_proc_input_tx = state.inner.lock().await.clone();
 
     let mut handles = Vec::new();
@@ -143,7 +143,7 @@ async fn receive_files(
 
     let files = state
         .iroh
-        .receive_files(ticket, Arc::new(FileTransferHandle(tx)))
+        .receive_files(ticket)
         .await
         .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
 
@@ -151,28 +151,7 @@ async fn receive_files(
         handle.await.unwrap();
     }
 
-    let outpath = if let Some(path) = dirs::download_dir() {
-        path
-    } else {
-        // Android download path
-        PathBuf::from("/storage/emulated/0/Download/")
-    };
-
-    for (name, hash) in files.0.iter() {
-        let content = state
-            .iroh
-            .get_node()
-            .0
-            .blobs()
-            .read_to_bytes(*hash)
-            .await
-            .map_err(|e| InvokeError::from_anyhow(anyhow!("failed to read blob: {}", e)))?;
-        let file_path = outpath.join(name);
-        std::fs::write(&file_path, content)
-            .map_err(|e| InvokeError::from_anyhow(anyhow!("failed to write file: {}", e)))?;
-    }
-
-    Ok(outpath)
+    Ok("[TEST]".into())
 }
 
 #[tauri::command]

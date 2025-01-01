@@ -8,10 +8,9 @@ name = "drop_core"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
-iroh = { workspace = true }  
+iroh = { workspace = true }
 iroh-blobs = { workspace = true }
 iroh-base = { workspace = true }
-iroh-net = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 futures-buffered = { workspace = true }
@@ -19,6 +18,9 @@ futures-lite = { workspace = true }
 serde = { workspace = true }
 postcard = "1.0.8"
 uniffi = { version = "0.28.0" }
+rand.workspace = true
+data-encoding = "2.6.0"
+async-channel = "2.3.1"
 
 [build-dependencies]
 uniffi = { version = "0.28.0", features = ["build"] }
