@@ -13,7 +13,6 @@ use tauri::{generate_context, generate_handler, AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 struct AppState {
-    pub iroh: IrohInstance,
     inner: Mutex<mpsc::Sender<Event>>,
 }
 
@@ -22,9 +21,8 @@ enum Event {
 }
 
 impl AppState {
-    fn new(iroh: IrohInstance, async_proc_input_tx: mpsc::Sender<Event>) -> Self {
+    fn new(async_proc_input_tx: mpsc::Sender<Event>) -> Self {
         AppState {
-            iroh,
             inner: Mutex::new(async_proc_input_tx),
         }
     }
@@ -34,9 +32,7 @@ async fn setup<R: tauri::Runtime>(
     handle: &tauri::AppHandle<R>,
     async_proc_input_tx: mpsc::Sender<Event>,
 ) -> Result<()> {
-    let iroh = IrohInstance::new().await.map_err(|e| anyhow!(e))?;
-
-    handle.manage(AppState::new(iroh, async_proc_input_tx));
+    handle.manage(AppState::new(async_proc_input_tx));
 
     Ok(())
 }
@@ -112,9 +108,7 @@ async fn generate_ticket(
     state: tauri::State<'_, AppState>,
     paths: Vec<String>,
 ) -> Result<BlobTicket, InvokeError> {
-    state
-        .iroh
-        .send_files(paths)
+    IrohInstance::send_files(paths)
         .await
         .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))
 }
@@ -141,9 +135,7 @@ async fn receive_files(
         }
     }));
 
-    let files = state
-        .iroh
-        .receive_files(ticket)
+    let files = IrohInstance::receive_files(ticket)
         .await
         .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
 
