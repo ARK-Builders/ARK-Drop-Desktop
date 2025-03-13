@@ -24,66 +24,22 @@ use std::{
 };
 use std::{path::PathBuf, str::FromStr};
 
-uniffi::setup_scaffolding!();
-
-#[derive(uniffi::Object)]
 pub struct IrohNode(pub Node<iroh_blobs::store::mem::Store>);
 
-#[derive(uniffi::Object)]
 pub struct IrohInstance {
     node: Arc<IrohNode>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FileTransfer {
     pub name: String,
     pub transferred: u64,
     pub total: u64,
 }
 
-uniffi::custom_type!(PathBuf, String);
-
-impl UniffiCustomTypeConverter for PathBuf {
-    type Builtin = String;
-
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-        Ok(PathBuf::from(val))
-    }
-
-    fn from_custom(obj: Self) -> Self::Builtin {
-        obj.to_string_lossy().to_string()
-    }
-}
-
-uniffi::custom_type!(BlobTicket, String);
-
-impl UniffiCustomTypeConverter for BlobTicket {
-    type Builtin = String;
-
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-        Ok(BlobTicket::from_str(&val)?)
-    }
-
-    fn from_custom(obj: Self) -> Self::Builtin {
-        obj.to_string()
-    }
-}
-
-#[derive(uniffi::Object)]
-pub struct DropCollection(pub Collection);
-
-impl From<Collection> for DropCollection {
-    fn from(collection: Collection) -> Self {
-        Self(collection)
-    }
-}
-
-#[derive(uniffi::Object)]
 pub struct FileTransferHandle(pub Sender<Vec<FileTransfer>>);
 
-#[uniffi::export]
 impl IrohInstance {
-    #[uniffi::constructor]
     pub async fn new() -> IrohResult<Self> {
         let node = Node::memory()
             .spawn()
@@ -98,16 +54,9 @@ impl IrohInstance {
         self.node.clone()
     }
 
-    /// Accepts a list of file paths.
-    ///
-    /// Returns a `BlobTicket`, which is a string that
-    /// can be used to retrieve the files from another node.
     pub async fn send_files(&self, files: Vec<PathBuf>) -> IrohResult<BlobTicket> {
-        // Import a series of blobs from the file system paths
         let outcomes = import_blobs(self, files).await?;
 
-        // A series of blobs is the same as a collection,
-        // but we need to convert the structure slightly to implicitly create it
         let collection = outcomes
             .into_iter()
             .map(|(path, outcome)| {
@@ -122,7 +71,6 @@ impl IrohInstance {
             })
             .collect();
 
-        // we now also import this collection into the node
         let (hash, _) = self
             .node
             .0
@@ -131,7 +79,6 @@ impl IrohInstance {
             .await
             .map_err(|e| IrohError::NodeError(e.to_string()))?;
 
-        // We can now generate a ticket from this collection
         self.node
             .0
             .blobs()
@@ -140,22 +87,17 @@ impl IrohInstance {
             .map_err(|e| IrohError::NodeError(e.to_string()))
     }
 
-    /// Accepts a `BlobTicket` and a `FileTransferHandle`
-    /// (a channel to send progress updates to the client)
-    ///
-    /// Returns a `DropCollection` (a wrapper around a collection).
     pub async fn receive_files(
         &self,
         ticket: String,
         handle_chunk: Arc<FileTransferHandle>,
-    ) -> IrohResult<DropCollection> {
+    ) -> IrohResult<Collection> {
         let ticket = BlobTicket::from_str(&ticket).map_err(|_| IrohError::InvalidTicket)?;
 
         if ticket.format() != BlobFormat::HashSeq {
             return Err(IrohError::UnsupportedFormat);
         }
 
-        // Download the collection from the node
         let mut download_stream = self
             .node
             .0
@@ -173,10 +115,6 @@ impl IrohInstance {
         let debug_log = std::env::var("DROP_DEBUG_LOG").is_ok();
         let temp_dir = std::env::temp_dir();
 
-        println!("Debug log: {}", debug_log);
-
-        // the download stream is a stream of download progress events
-        // we can send these events to the client to update the progress
         while let Some(event) = download_stream.next().await {
             let event = event.map_err(|e| IrohError::DownloadError(e.to_string()))?;
 
@@ -347,7 +285,6 @@ impl IrohInstance {
             }
         }
 
-        // If we reach this point, the download stream has ended without completing the download
         if debug_log {
             println!("[DEBUG FILE]: {:?}", temp_dir.join("drop_debug.log"));
         }
@@ -382,7 +319,10 @@ pub async fn import_blobs<'a>(
                 if let Ok(progress) = outcome {
                     Ok((path.clone(), progress))
                 } else {
-                    Err(IrohError::NodeError("Failed to import blob".to_string()))
+                    Err(IrohError::NodeError(format!(
+                        "Failed to import blob: {:?}",
+                        outcome
+                    )))
                 }
             }
             Err(e) => Err(IrohError::NodeError(e.to_string())),
@@ -390,4 +330,82 @@ pub async fn import_blobs<'a>(
     });
 
     try_join_all(outcomes).await
+}
+
+#[cfg(test)]
+mod test {
+    use std::{
+        fs,
+        path::PathBuf,
+        sync::{mpsc::channel, Arc},
+    };
+
+    use tokio;
+
+    use crate::{FileTransfer, IrohInstance};
+
+    #[tokio::test]
+    async fn test_send_files() {
+        let instance = IrohInstance::new().await.unwrap();
+
+        // Create files directly in the current directory
+        let file1 = PathBuf::from("./test_file1.txt");
+        let file2 = PathBuf::from("./test_file2.txt");
+        std::fs::write(&file1, "content1").unwrap();
+        std::fs::write(&file2, "content2").unwrap();
+        let files = vec![
+            fs::canonicalize(&file1).unwrap(),
+            fs::canonicalize(&file2).unwrap(),
+        ];
+
+        // Call send_files and verify the result
+        let ticket = instance.send_files(files).await.unwrap();
+        assert!(!ticket.to_string().is_empty(), "Ticket should not be empty");
+
+        // Clean up
+        std::fs::remove_file(&file1).unwrap();
+        std::fs::remove_file(&file2).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_receive_files() {
+        // Create an in-memory IrohInstance
+        let send_instance = IrohInstance::new().await.unwrap();
+        let receive_instance = IrohInstance::new().await.unwrap();
+
+        let file1 = PathBuf::from("test_file1.txt");
+        let file2 = PathBuf::from("test_file2.txt");
+        std::fs::write(&file1, "content1").unwrap();
+        std::fs::write(&file2, "content2").unwrap();
+        let files = vec![
+            fs::canonicalize(&file1).unwrap(),
+            fs::canonicalize(&file2).unwrap(),
+        ];
+        let ticket = send_instance.send_files(files).await.unwrap();
+        let ticket_str = ticket.to_string();
+
+        let (tx, mut rx) = channel::<Vec<FileTransfer>>();
+        let handle = Arc::new(crate::FileTransferHandle(tx)); // Assuming FileTransferHandle wraps the sender
+
+        let collection = receive_instance
+            .receive_files(ticket_str, handle)
+            .await
+            .unwrap();
+
+        // Verify the collection
+        let names: Vec<String> = collection.iter().map(|(name, _)| name.clone()).collect();
+        assert_eq!(names.len(), 2, "Collection should contain two files");
+        assert!(
+            names.contains(&"test_file1.txt".to_string()),
+            "Collection should contain test_file1.txt"
+        );
+        assert!(
+            names.contains(&"test_file2.txt".to_string()),
+            "Collection should contain test_file2.txt"
+        );
+
+        // Clean up
+        std::fs::remove_file(&file1).unwrap();
+        std::fs::remove_file(&file2).unwrap();
+    }
 }

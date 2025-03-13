@@ -158,7 +158,7 @@ async fn receive_files(
         PathBuf::from("/storage/emulated/0/Download/")
     };
 
-    for (name, hash) in files.0.iter() {
+    for (name, hash) in files.iter() {
         let content = state
             .iroh
             .get_node()
