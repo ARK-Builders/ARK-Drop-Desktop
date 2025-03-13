@@ -9,7 +9,7 @@ export default defineConfig({
 	server: {
 	  host: host || false,
 	  port: 1420,
-	  strictPort: true,
+	  strictPort: false,
 	  hmr: host
 		? {
 			protocol: 'ws',

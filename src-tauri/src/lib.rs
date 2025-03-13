@@ -3,10 +3,12 @@
 
 use anyhow::{anyhow, Result};
 use drop_core::metadata::FileTransfer;
+use drop_core::send::SendEvent;
 use drop_core::IrohInstance;
 use iroh_blobs::ticket::BlobTicket;
 use iroh_blobs::BlobFormat;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::{path::PathBuf, vec};
 use tauri::ipc::InvokeError;
 use tauri::{generate_context, generate_handler, AppHandle, Emitter, Manager};
@@ -108,7 +110,9 @@ async fn generate_ticket(
     state: tauri::State<'_, AppState>,
     paths: Vec<String>,
 ) -> Result<BlobTicket, InvokeError> {
-    IrohInstance::send_files(paths)
+    let (tx, rx) = std::sync::mpsc::channel::<SendEvent>();
+
+    IrohInstance::send_files(paths, Arc::new(tx))
         .await
         .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))
 }
@@ -135,9 +139,11 @@ async fn receive_files(
         }
     }));
 
-    let files = IrohInstance::receive_files(ticket)
-        .await
-        .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
+    // let files = IrohInstance::receive_files(ticket, tx)
+    //     .await
+    //     .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
+
+    // println!("files: {:?}", files);
 
     for handle in handles {
         handle.await.unwrap();
