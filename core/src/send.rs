@@ -1,7 +1,8 @@
-use std::sync::{mpsc::Sender, Arc};
+use std::sync::Arc;
 
 use futures_lite::future::Boxed;
 use iroh_blobs::provider::{self, CustomEventSender};
+use tokio::sync::mpsc::Sender;
 
 #[derive(Debug, Clone)]
 pub struct SendEvent {
@@ -28,9 +29,12 @@ impl CustomEventSender for SendStatus {
     fn try_send(&self, event: provider::Event) {
         match event {
             provider::Event::ClientConnected { connection_id } => {
-                let _ = self.sender.send(SendEvent {
-                    message: format!("{} client connected", connection_id),
-                });
+                println!("[SEND] Client Connecyed");
+                // self.sender
+                //     .blocking_send(SendEvent {
+                //         message: format!("{} client connected", connection_id),
+                //     })
+                //     .unwrap();
             }
             provider::Event::TransferBlobCompleted {
                 connection_id,
@@ -39,26 +43,41 @@ impl CustomEventSender for SendStatus {
                 size,
                 ..
             } => {
-                let _ = self.sender.send(SendEvent {
-                    message: format!(
-                        "{} transfer blob completed {} {} {}",
-                        connection_id, hash, index, size
-                    ),
-                });
+                println!("[SEND] TransferBlobCompleted");
+
+                // let _ = self
+                //     .sender
+                //     .blocking_send(SendEvent {
+                //         message: format!(
+                //             "{} transfer blob completed {} {} {}",
+                //             connection_id, hash, index, size
+                //         ),
+                //     })
+                //     .unwrap();
             }
             provider::Event::TransferCompleted {
                 connection_id,
                 stats,
                 ..
             } => {
-                let _ = self.sender.send(SendEvent {
-                    message: format!("{} transfer completed {:?}", connection_id, stats),
-                });
+                println!("[SEND] TransferCompleted");
+
+                // let _ = self
+                //     .sender
+                //     .blocking_send(SendEvent {
+                //         message: format!("{} transfer completed {:?}", connection_id, stats),
+                //     })
+                //     .unwrap();
             }
             provider::Event::TransferAborted { connection_id, .. } => {
-                let _ = self.sender.send(SendEvent {
-                    message: format!("{} transfer aborted", connection_id),
-                });
+                println!("[SEND] TransferAborted");
+
+                // let _ = self
+                //     .sender
+                //     .blocking_send(SendEvent {
+                //         message: format!("{} transfer aborted", connection_id),
+                //     })
+                //     .unwrap();
             }
             _ => {}
         };

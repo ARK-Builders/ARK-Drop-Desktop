@@ -110,9 +110,10 @@ async fn generate_ticket(
     state: tauri::State<'_, AppState>,
     paths: Vec<String>,
 ) -> Result<BlobTicket, InvokeError> {
-    let (tx, rx) = std::sync::mpsc::channel::<SendEvent>();
-
-    IrohInstance::send_files(paths, Arc::new(tx))
+    let (tx, rx) = tokio::sync::mpsc::channel::<SendEvent>(32);
+    let sender = IrohInstance::sender(Arc::new(tx)).await.unwrap();
+    sender
+        .send_files(paths)
         .await
         .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))
 }
