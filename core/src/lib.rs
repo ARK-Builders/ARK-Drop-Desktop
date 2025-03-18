@@ -6,18 +6,21 @@ use std::collections::BTreeMap;
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 use anyhow::{Context, Error, Result};
+use error::IrohError;
 use futures_buffered::join_all;
+use futures_lite::StreamExt;
 use iroh::{protocol::Router, Endpoint, SecretKey};
 use iroh_blobs::format::collection::Collection;
 use iroh_blobs::get::db::DownloadProgress;
-use iroh_blobs::get::request::get_hash_seq_and_sizes;
+
+use iroh_blobs::hashseq::HashSeq;
 use iroh_blobs::store::{ImportProgress, Store};
 use iroh_blobs::HashAndFormat;
 use iroh_blobs::{
     net_protocol::Blobs, store::ImportMode, ticket::BlobTicket, util::SetTagOption, BlobFormat,
     Hash, Tag,
 };
-use metadata::FileTransfer;
+use metadata::{CollectionMetadata, FileTransfer};
 use send::{SendEvent, SendStatus};
 use tokio::sync::mpsc::Sender;
 
@@ -104,27 +107,174 @@ impl IrohInstance {
 
         let connection = endpoint.connect(addr, iroh_blobs::protocol::ALPN).await?;
 
-        let dir_name = format!(".drop-get-{}", ticket.hash().to_hex());
-        let iroh_data_dir = std::env::current_dir()?.join(dir_name);
-        let db = iroh_blobs::store::fs::Store::load(&iroh_data_dir).await?;
-        let hash_and_format = HashAndFormat {
-            hash: ticket.hash(),
-            format: ticket.format(),
-        };
-        let (_hash_seq, sizes) =
-            get_hash_seq_and_sizes(&connection, &hash_and_format.hash, 1024 * 1024 * 32).await?;
-        let total_size = sizes.iter().sum::<u64>();
-        let total_files = sizes.len().saturating_sub(1);
-        let payload_size = sizes.iter().skip(1).sum::<u64>();
-        let (send, recv) = async_channel::bounded(32);
-        let progress = iroh_blobs::util::progress::AsyncChannelProgressSender::new(send);
-        let _task = tokio::spawn(IrohInstance::show_download_progress(recv, total_size));
-        let get_conn = || async move { Ok(connection) };
-        let stats =
-            iroh_blobs::get::db::get_to_db(&db, get_conn, &hash_and_format, progress).await?;
-        let collection = Collection::load_db(&db, &hash_and_format.hash).await?;
+        // let dir_name = format!(".drop-get-{}", ticket.hash().to_hex());
+        // let iroh_data_dir = std::env::current_dir()?.join(dir_name);
+        // let db = iroh_blobs::store::fs::Store::load(&iroh_data_dir).await?;
 
-        Ok(collection)
+        let blobs = Blobs::memory().build(&endpoint);
+
+        let mut download_stream = blobs
+            .client()
+            .download_hash_seq(ticket.hash(), ticket.node_addr().clone())
+            .await
+            .map_err(|e| IrohError::DownloadError(e.to_string()))?;
+
+        let mut curr_metadata: Option<CollectionMetadata> = None;
+        let mut curr_hashseq: Option<HashSeq> = None;
+        let mut files: Vec<FileTransfer> = Vec::new();
+
+        let mut map: BTreeMap<u64, String> = BTreeMap::new();
+
+        let debug_log = std::env::var("DROP_DEBUG_LOG").is_ok();
+        let temp_dir = std::env::temp_dir();
+
+        // the download stream is a stream of download progress events
+        // we can send these events to the client to update the progress
+        while let Some(event) = download_stream.next().await {
+            let event = event.map_err(|e| IrohError::DownloadError(e.to_string()))?;
+
+            match event {
+                DownloadProgress::FoundHashSeq { hash, .. } => {
+                    let hashseq = blobs
+                        .client()
+                        .read_to_bytes(hash)
+                        .await
+                        .map_err(|e| IrohError::DownloadError(e.to_string()))?;
+                    let hashseq = HashSeq::try_from(hashseq)
+                        .map_err(|e| IrohError::InvalidMetadata(e.to_string()))?;
+
+                    let metadata_hash = hashseq
+                        .iter()
+                        .next()
+                        .ok_or(IrohError::InvalidMetadata("hashseq is empty".to_string()))?;
+                    let metadata_bytes = blobs
+                        .client()
+                        .read_to_bytes(metadata_hash)
+                        .await
+                        .map_err(|e| IrohError::DownloadError(e.to_string()))?;
+
+                    let metadata: CollectionMetadata = postcard::from_bytes(&metadata_bytes)
+                        .map_err(|e| IrohError::InvalidMetadata(e.to_string()))?;
+
+                    // The hash sequence should have one more element than the metadata
+                    // because the first element is the metadata itself
+                    if metadata.names.len() + 1 != hashseq.len() {
+                        return Err(IrohError::InvalidMetadata(
+                            "metadata does not match hashseq".to_string(),
+                        )
+                        .into());
+                    }
+                    curr_hashseq = Some(hashseq);
+                    curr_metadata = Some(metadata);
+                }
+
+                DownloadProgress::AllDone(_) => {
+                    let collection = blobs
+                        .client()
+                        .get_collection(ticket.hash())
+                        .await
+                        .map_err(|e: anyhow::Error| IrohError::DownloadError(e.to_string()))?;
+                    files = vec![];
+                    for (name, hash) in collection.iter() {
+                        let content = blobs
+                            .client()
+                            .read_to_bytes(*hash)
+                            .await
+                            .map_err(|e| IrohError::DownloadError(e.to_string()))?;
+                        files.push({
+                            FileTransfer {
+                                name: name.clone(),
+                                transferred: content.len() as u64,
+                                total: content.len() as u64,
+                            }
+                        })
+                    }
+                    tx.send(files.clone())
+                        .await
+                        .map_err(|_| IrohError::SendError)?;
+
+                    return Ok(collection.into());
+                }
+
+                DownloadProgress::Done { id } => {
+                    if let Some(name) = map.get(&id) {
+                        if let Some(file) = files.iter_mut().find(|file| file.name == *name) {
+                            file.transferred = file.total;
+                        }
+                    }
+                    tx.send(files.clone())
+                        .await
+                        .map_err(|_| IrohError::SendError)?;
+                }
+
+                DownloadProgress::Found { id, hash, size, .. } => {
+                    if let (Some(hashseq), Some(metadata)) = (&curr_hashseq, &curr_metadata) {
+                        if let Some(idx) = hashseq.iter().position(|h| h == hash) {
+                            if idx >= 1 && idx <= metadata.names.len() {
+                                if let Some(name) = metadata.names.get(idx - 1) {
+                                    files.push(FileTransfer {
+                                        name: name.clone(),
+                                        transferred: 0,
+                                        total: size,
+                                    });
+                                    tx.send(files.clone())
+                                        .await
+                                        .map_err(|_| IrohError::SendError)?;
+                                    map.insert(id, name.clone());
+                                }
+                            }
+                        } else {
+                            return Err(IrohError::Unreachable(
+                                file!().to_string(),
+                                line!().to_string(),
+                            )
+                            .into());
+                        }
+                    }
+                }
+
+                DownloadProgress::Progress { id, offset } => {
+                    if let Some(name) = map.get(&id) {
+                        if let Some(file) = files.iter_mut().find(|file| file.name == **name) {
+                            file.transferred = offset;
+                        }
+                    }
+                    tx.send(files.clone())
+                        .await
+                        .map_err(|_| IrohError::SendError)?;
+                }
+
+                DownloadProgress::FoundLocal { hash, size, .. } => {
+                    if let (Some(hashseq), Some(metadata)) = (&curr_hashseq, &curr_metadata) {
+                        if let Some(idx) = hashseq.iter().position(|h| h == hash) {
+                            if idx >= 1 && idx <= metadata.names.len() {
+                                if let Some(name) = metadata.names.get(idx - 1) {
+                                    if let Some(file) =
+                                        files.iter_mut().find(|file| file.name == *name)
+                                    {
+                                        file.transferred = size.value();
+                                        file.total = size.value();
+                                        tx.send(files.clone())
+                                            .await
+                                            .map_err(|_| IrohError::SendError)?;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                _ => {}
+            }
+        }
+
+        let collection = blobs
+            .client()
+            .get_collection(ticket.hash())
+            .await
+            .map_err(|e| IrohError::DownloadError(e.to_string()))?;
+
+        Ok(collection.into())
     }
 
     pub async fn import_collection(&self, paths: Vec<PathBuf>) -> Result<(Hash, Tag), Error> {
@@ -132,7 +282,7 @@ impl IrohInstance {
 
         let (send, recv) = async_channel::bounded(32);
         let progress = iroh_blobs::util::progress::AsyncChannelProgressSender::new(send);
-        let show_progress = tokio::spawn(IrohInstance::show_ingest_progress(recv));
+        let _ = tokio::spawn(IrohInstance::show_ingest_progress(recv));
 
         let outcomes = join_all(paths.into_iter().map(|path| {
             let progress = progress.clone();
@@ -143,7 +293,7 @@ impl IrohInstance {
                         path.clone(),
                         ImportMode::TryReference,
                         BlobFormat::Raw,
-                        progress, // Use the cloned progress
+                        progress,
                     )
                     .await
                     .expect("Failed to import file."),
@@ -172,48 +322,6 @@ impl IrohInstance {
             .create_collection(collection, SetTagOption::Auto, Default::default())
             .await
             .expect("Failed to create collection."))
-    }
-
-    pub async fn show_download_progress(
-        recv: async_channel::Receiver<DownloadProgress>,
-        total_size: u64,
-    ) -> anyhow::Result<()> {
-        let mut total_done = 0;
-        let mut sizes = BTreeMap::new();
-        loop {
-            let x = recv.recv().await;
-            match x {
-                Ok(DownloadProgress::Connected) => {
-                    println!("[RECV]: Connected");
-                }
-                Ok(DownloadProgress::FoundHashSeq { children, .. }) => {
-                    println!("[RECV]: FoundHashSeq");
-                }
-                Ok(DownloadProgress::Found { id, size, .. }) => {
-                    sizes.insert(id, size);
-
-                    println!("[RECV]: Found");
-                }
-                Ok(DownloadProgress::Progress { offset, .. }) => {
-                    println!("[RECV]: Progress");
-                }
-                Ok(DownloadProgress::Done { id }) => {
-                    total_done += sizes.remove(&id).unwrap_or_default();
-                }
-                Ok(DownloadProgress::AllDone(stats)) => {
-                    println!("[RECV]: All Done");
-                    break;
-                }
-                Ok(DownloadProgress::Abort(e)) => {
-                    anyhow::bail!("download aborted: {e:?}");
-                }
-                Err(e) => {
-                    anyhow::bail!("error reading progress: {e:?}");
-                }
-                _ => {}
-            }
-        }
-        Ok(())
     }
 
     pub async fn show_ingest_progress(
@@ -262,9 +370,9 @@ mod tests {
 
         tokio::spawn(async move {
             while let Some(event) = rx.recv().await {
-                println!("[RECV]: Received event, {:?}", event);
+                println!("[RECEIVER]: Received event, {:?}", event);
             }
-            println!("[RECV]: Receiver closed, all events processed.");
+            println!("[RECEIVER]: Receiver closed, all events processed.");
         });
 
         let collection = IrohInstance::receive_files(ticket.to_string(), tx)
