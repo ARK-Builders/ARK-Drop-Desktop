@@ -19,12 +19,17 @@
 	let transferFiles: FileTransferDTO[] = [];
 
 	onMount(async () => {
-		let start = Date.now();
-		output = await invoke('receive_files', {
-			ticket: data.ticket
-		});
-		time_complete = Date.now() - start;
-		done = true;
+		try {
+			let start = Date.now();
+			output = await invoke('receive_files', {
+				ticket: data.ticket
+			});
+			time_complete = Date.now() - start;
+			done = true;
+		} catch (error) {
+			console.error("ERROR:", error)
+		}
+
 	});
 
 	listen('download_progress', (event) => {

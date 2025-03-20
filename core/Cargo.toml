@@ -16,12 +16,13 @@ thiserror = { workspace = true }
 futures-buffered = { workspace = true }
 futures-lite = { workspace = true }
 serde = { workspace = true }
+rand.workspace = true
+tokio.workspace = true
+
 postcard = "1.0.8"
 uniffi = { version = "0.28.0" }
-rand.workspace = true
 data-encoding = "2.6.0"
 async-channel = "2.3.1"
-tokio.workspace = true
 tracing-subscriber = "0.3.19"
 
 [build-dependencies]

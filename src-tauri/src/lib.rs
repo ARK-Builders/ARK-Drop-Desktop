@@ -125,32 +125,30 @@ async fn receive_files(
 ) -> Result<String, InvokeError> {
     let async_proc_input_tx = state.inner.lock().await.clone();
 
-    let mut handles = Vec::new();
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<FileTransfer>>(2);
 
-    let (tx, rx) = std::sync::mpsc::channel::<Vec<FileTransfer>>();
-
-    handles.push(tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         loop {
-            let files = rx.recv();
-            if let Ok(files) = files {
+            let files = rx.recv().await;
+            if let Some(files) = files {
                 let _ = async_proc_input_tx.send(Event::Files(files)).await;
             } else {
                 break;
             }
         }
-    }));
+    });
 
-    // let files = IrohInstance::receive_files(ticket, tx)
-    //     .await
-    //     .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
+    let outpath = dirs::download_dir().expect("No Downloads Dir");
 
-    // println!("files: {:?}", files);
+    let files = IrohInstance::receive_files(ticket, tx)
+        .await
+        .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
 
-    for handle in handles {
-        handle.await.unwrap();
-    }
+    println!("files: {:?}", files);
 
-    Ok("[TEST]".into())
+    handle.await.unwrap();
+
+    Ok(outpath.to_str().unwrap().to_owned())
 }
 
 #[tauri::command]
