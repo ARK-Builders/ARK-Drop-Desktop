@@ -15,7 +15,6 @@ use iroh_blobs::get::db::DownloadProgress;
 
 use iroh_blobs::hashseq::HashSeq;
 use iroh_blobs::store::{ImportProgress, Store};
-use iroh_blobs::HashAndFormat;
 use iroh_blobs::{
     net_protocol::Blobs, store::ImportMode, ticket::BlobTicket, util::SetTagOption, BlobFormat,
     Hash, Tag,
@@ -357,7 +356,7 @@ mod tests {
 
         tokio::spawn(async move {
             while let Some(event) = rx.recv().await {
-                println!("[SENDER]: Received event, {:?}", event);
+                println!("[SENDER]: Received event , {:?}", event);
             }
             println!("[SENDER]: Receiver closed, all events processed.");
         });

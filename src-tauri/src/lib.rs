@@ -146,7 +146,7 @@ async fn receive_files(
 
     println!("files: {:?}", files);
 
-    handle.await.unwrap();
+    handle.await.expect("COuld not await handle");
 
     Ok(outpath.to_str().unwrap().to_owned())
 }
