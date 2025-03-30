@@ -29,6 +29,7 @@ drop_core = { path = "../core" }
 iroh-blobs = { workspace = true }
 iroh-base = { workspace = true }
 anyhow = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 tokio = { workspace = true, features = ["full"] }
 

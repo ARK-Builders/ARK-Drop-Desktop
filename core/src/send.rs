@@ -24,14 +24,13 @@ impl CustomEventSender for SendStatus {
     fn send(&self, event: iroh_blobs::provider::Event) -> Boxed<()> {
         let sender = self.sender.clone();
         Box::pin(async move {
-            match event {
+            let result = match event {
                 provider::Event::ClientConnected { connection_id } => {
                     sender
                         .send(SendEvent {
                             message: format!("{} client connected", connection_id),
                         })
                         .await
-                        .unwrap();
                 }
                 provider::Event::TransferBlobCompleted {
                     connection_id,
@@ -48,7 +47,6 @@ impl CustomEventSender for SendStatus {
                             ),
                         })
                         .await
-                        .unwrap();
                 }
                 provider::Event::TransferCompleted {
                     connection_id,
@@ -60,7 +58,6 @@ impl CustomEventSender for SendStatus {
                             message: format!("{} transfer completed {:?}", connection_id, stats),
                         })
                         .await
-                        .unwrap();
                 }
                 provider::Event::TransferAborted { connection_id, .. } => {
                     sender
@@ -68,9 +65,12 @@ impl CustomEventSender for SendStatus {
                             message: format!("{} transfer aborted", connection_id),
                         })
                         .await
-                        .unwrap();
                 }
-                _ => {}
+                _ => Ok(()), // For unhandled events, return Ok
+            };
+
+            if let Err(e) = result {
+                eprintln!("Failed to send event: {}", e);
             }
         }) as Boxed<()>
     }

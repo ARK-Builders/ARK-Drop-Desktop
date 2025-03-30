@@ -26,10 +26,7 @@ use tokio::sync::mpsc::Sender;
 fn get_or_create_secret() -> anyhow::Result<SecretKey> {
     match std::env::var("IROH_SECRET") {
         Ok(secret) => SecretKey::from_str(&secret).context("invalid secret"),
-        Err(_) => {
-            let key = SecretKey::generate(rand::rngs::OsRng);
-            Ok(key)
-        }
+        Err(_) => Ok(SecretKey::generate(rand::rngs::OsRng)),
     }
 }
 
@@ -51,48 +48,45 @@ impl IrohInstance {
             .bind()
             .await?;
 
-        let ps = SendStatus::new(sender.clone());
-
+        let ps = SendStatus::new(sender);
         let blobs = Blobs::memory().events(ps.into()).build(&endpoint);
 
-        let router = Router::builder(endpoint)
-            .accept(iroh_blobs::ALPN, blobs.clone())
+        let router = Router::builder(endpoint.clone())
+            .accept(iroh_blobs::protocol::ALPN, blobs.clone())
             .spawn()
-            .await
-            .unwrap();
+            .await?;
 
-        let _ = router.endpoint().home_relay().initialized().await?;
+        router
+            .endpoint()
+            .home_relay()
+            .initialized()
+            .await
+            .context("Failed to initialize home relay")?;
 
         Ok(Self { router, blobs })
     }
 
-    pub async fn send_files(&self, files: Vec<String>) -> Result<BlobTicket, Error> {
+    pub async fn send_files(&self, files: Vec<String>) -> Result<BlobTicket> {
         let paths: Vec<PathBuf> = files
             .into_iter()
-            .map(|path| Ok(PathBuf::from_str(&path)?))
-            .filter_map(|path: Result<PathBuf, Error>| path.ok())
+            .filter_map(|path| PathBuf::from_str(&path).ok())
             .collect();
 
-        let (hash, _tag) = self
-            .import_collection(paths)
-            .await
-            .expect("Failed to Import collection");
+        let (hash, _tag) = self.import_collection(paths).await?;
 
         Ok(BlobTicket::new(
             self.router.endpoint().node_id().into(),
             hash,
-            iroh_blobs::BlobFormat::HashSeq,
-        )
-        .expect("Failed to create ticket"))
+            BlobFormat::HashSeq,
+        )?)
     }
 
     pub async fn receive_files(
         ticket: String,
         tx: Sender<Vec<FileTransfer>>,
-    ) -> Result<Collection, Error> {
+    ) -> Result<Collection> {
         let ticket = BlobTicket::from_str(&ticket)?;
         let addr = ticket.node_addr().clone();
-
         let secret_key = get_or_create_secret()?;
 
         let endpoint = Endpoint::builder()
@@ -103,12 +97,6 @@ impl IrohInstance {
             .relay_mode(iroh::RelayMode::Default)
             .bind()
             .await?;
-
-        let connection = endpoint.connect(addr, iroh_blobs::protocol::ALPN).await?;
-
-        // let dir_name = format!(".drop-get-{}", ticket.hash().to_hex());
-        // let iroh_data_dir = std::env::current_dir()?.join(dir_name);
-        // let db = iroh_blobs::store::fs::Store::load(&iroh_data_dir).await?;
 
         let blobs = Blobs::memory().build(&endpoint);
 
@@ -121,14 +109,8 @@ impl IrohInstance {
         let mut curr_metadata: Option<CollectionMetadata> = None;
         let mut curr_hashseq: Option<HashSeq> = None;
         let mut files: Vec<FileTransfer> = Vec::new();
-
         let mut map: BTreeMap<u64, String> = BTreeMap::new();
 
-        let debug_log = std::env::var("DROP_DEBUG_LOG").is_ok();
-        let temp_dir = std::env::temp_dir();
-
-        // the download stream is a stream of download progress events
-        // we can send these events to the client to update the progress
         while let Some(event) = download_stream.next().await {
             let event = event.map_err(|e| IrohError::DownloadError(e.to_string()))?;
 
@@ -141,22 +123,17 @@ impl IrohInstance {
                         .map_err(|e| IrohError::DownloadError(e.to_string()))?;
                     let hashseq = HashSeq::try_from(hashseq)
                         .map_err(|e| IrohError::InvalidMetadata(e.to_string()))?;
-
-                    let metadata_hash = hashseq
-                        .iter()
-                        .next()
-                        .ok_or(IrohError::InvalidMetadata("hashseq is empty".to_string()))?;
+                    let metadata_hash = hashseq.iter().next().ok_or_else(|| {
+                        IrohError::InvalidMetadata("hashseq is empty".to_string())
+                    })?;
                     let metadata_bytes = blobs
                         .client()
                         .read_to_bytes(metadata_hash)
                         .await
                         .map_err(|e| IrohError::DownloadError(e.to_string()))?;
-
                     let metadata: CollectionMetadata = postcard::from_bytes(&metadata_bytes)
                         .map_err(|e| IrohError::InvalidMetadata(e.to_string()))?;
 
-                    // The hash sequence should have one more element than the metadata
-                    // because the first element is the metadata itself
                     if metadata.names.len() + 1 != hashseq.len() {
                         return Err(IrohError::InvalidMetadata(
                             "metadata does not match hashseq".to_string(),
@@ -172,26 +149,23 @@ impl IrohInstance {
                         .client()
                         .get_collection(ticket.hash())
                         .await
-                        .map_err(|e: anyhow::Error| IrohError::DownloadError(e.to_string()))?;
-                    files = vec![];
+                        .map_err(|e| IrohError::DownloadError(e.to_string()))?;
+                    files.clear();
                     for (name, hash) in collection.iter() {
                         let content = blobs
                             .client()
                             .read_to_bytes(*hash)
                             .await
                             .map_err(|e| IrohError::DownloadError(e.to_string()))?;
-                        files.push({
-                            FileTransfer {
-                                name: name.clone(),
-                                transferred: content.len() as u64,
-                                total: content.len() as u64,
-                            }
-                        })
+                        files.push(FileTransfer {
+                            name: name.clone(),
+                            transferred: content.len() as u64,
+                            total: content.len() as u64,
+                        });
                     }
                     tx.send(files.clone())
                         .await
                         .map_err(|_| IrohError::SendError)?;
-
                     return Ok(collection.into());
                 }
 
@@ -222,19 +196,13 @@ impl IrohInstance {
                                     map.insert(id, name.clone());
                                 }
                             }
-                        } else {
-                            return Err(IrohError::Unreachable(
-                                file!().to_string(),
-                                line!().to_string(),
-                            )
-                            .into());
                         }
                     }
                 }
 
                 DownloadProgress::Progress { id, offset } => {
                     if let Some(name) = map.get(&id) {
-                        if let Some(file) = files.iter_mut().find(|file| file.name == **name) {
+                        if let Some(file) = files.iter_mut().find(|file| file.name == *name) {
                             file.transferred = offset;
                         }
                     }
@@ -272,68 +240,60 @@ impl IrohInstance {
             .get_collection(ticket.hash())
             .await
             .map_err(|e| IrohError::DownloadError(e.to_string()))?;
-
         Ok(collection.into())
     }
 
-    pub async fn import_collection(&self, paths: Vec<PathBuf>) -> Result<(Hash, Tag), Error> {
+    pub async fn import_collection(&self, paths: Vec<PathBuf>) -> Result<(Hash, Tag)> {
         let db = self.blobs.store();
-
         let (send, recv) = async_channel::bounded(32);
         let progress = iroh_blobs::util::progress::AsyncChannelProgressSender::new(send);
-        let _ = tokio::spawn(IrohInstance::show_ingest_progress(recv));
+        let _progress_task = tokio::spawn(IrohInstance::show_ingest_progress(recv));
 
         let outcomes = join_all(paths.into_iter().map(|path| {
             let progress = progress.clone();
             async move {
-                (
-                    path.clone(),
-                    db.import_file(
+                let outcome = db
+                    .import_file(
                         path.clone(),
                         ImportMode::TryReference,
                         BlobFormat::Raw,
                         progress,
                     )
-                    .await
-                    .expect("Failed to import file."),
-                )
+                    .await?;
+                Ok((path, outcome))
             }
         }))
-        .await;
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?;
 
-        let collection = outcomes
-            .into_iter()
-            .map(|(path, outcome)| {
-                let name = path
-                    .file_name()
-                    .expect("The file name is not valid.")
-                    .to_string_lossy()
-                    .to_string();
-
-                let hash = outcome.0.hash().clone();
-                (name, hash)
-            })
-            .collect();
+        let collection = Collection::from_iter(
+            outcomes
+                .into_iter()
+                .map(|(path, outcome)| {
+                    let name = path
+                        .file_name()
+                        .ok_or_else(|| anyhow::anyhow!("Invalid file name"))?
+                        .to_string_lossy()
+                        .to_string();
+                    let hash = outcome.0.hash().clone();
+                    Ok((name, hash))
+                })
+                .collect::<Result<Vec<_>>>()?,
+        );
 
         Ok(self
             .blobs
             .client()
             .create_collection(collection, SetTagOption::Auto, Default::default())
-            .await
-            .expect("Failed to create collection."))
+            .await?)
     }
 
     pub async fn show_ingest_progress(
         recv: async_channel::Receiver<ImportProgress>,
     ) -> anyhow::Result<()> {
-        loop {
-            let event = recv.recv().await;
-            match event {
-                Ok(_) => {}
-                Err(_e) => {
-                    break;
-                }
-            }
+        while let Ok(_event) = recv.recv().await {
+            // Add logging here if desired
         }
         Ok(())
     }
@@ -341,32 +301,26 @@ impl IrohInstance {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use crate::{metadata::FileTransfer, send::SendEvent, IrohInstance};
+    use super::*;
     use tokio;
 
     #[tokio::test]
-    async fn test_receive_files() {
+    async fn test_receive_files() -> Result<()> {
         tracing_subscriber::fmt::init();
-
         let files = vec!["Cargo.toml".to_string()];
-
         let (tx, mut rx) = tokio::sync::mpsc::channel::<SendEvent>(32);
 
         tokio::spawn(async move {
             while let Some(event) = rx.recv().await {
-                println!("[SENDER]: Received event , {:?}", event);
+                println!("[SENDER]: Received event, {:?}", event);
             }
             println!("[SENDER]: Receiver closed, all events processed.");
         });
 
-        let sender = IrohInstance::sender(Arc::new(tx)).await.unwrap();
-
-        let ticket = sender.send_files(files).await.unwrap();
+        let sender = IrohInstance::sender(Arc::new(tx)).await?;
+        let ticket = sender.send_files(files).await?;
 
         let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<FileTransfer>>(32);
-
         tokio::spawn(async move {
             while let Some(event) = rx.recv().await {
                 println!("[RECEIVER]: Received event, {:?}", event);
@@ -374,10 +328,7 @@ mod tests {
             println!("[RECEIVER]: Receiver closed, all events processed.");
         });
 
-        let collection = IrohInstance::receive_files(ticket.to_string(), tx)
-            .await
-            .unwrap();
-
-        assert!(true);
+        let _collection = IrohInstance::receive_files(ticket.to_string(), tx).await?;
+        Ok(())
     }
 }
