@@ -2,20 +2,29 @@ use std::sync::Arc;
 
 use futures_lite::future::Boxed;
 use iroh_blobs::provider::{self, CustomEventSender};
+use serde::Serialize;
 use tokio::sync::mpsc::Sender;
 
-#[derive(Debug, Clone)]
+use crate::metadata::FileTransfer;
+
+#[derive(Debug)]
+pub enum Event {
+    Files(Vec<FileTransfer>),
+    Send(SendEvent),
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct SendEvent {
     pub message: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct SendStatus {
-    sender: Arc<Sender<SendEvent>>,
+    sender: Arc<Sender<Event>>,
 }
 
 impl SendStatus {
-    pub fn new(sender: Arc<Sender<SendEvent>>) -> Self {
+    pub fn new(sender: Arc<Sender<Event>>) -> Self {
         Self { sender }
     }
 }
@@ -27,9 +36,9 @@ impl CustomEventSender for SendStatus {
             let result = match event {
                 provider::Event::ClientConnected { connection_id } => {
                     sender
-                        .send(SendEvent {
+                        .send(Event::Send(SendEvent {
                             message: format!("{} client connected", connection_id),
-                        })
+                        }))
                         .await
                 }
                 provider::Event::TransferBlobCompleted {
@@ -40,12 +49,12 @@ impl CustomEventSender for SendStatus {
                     ..
                 } => {
                     sender
-                        .send(SendEvent {
+                        .send(Event::Send(SendEvent {
                             message: format!(
                                 "{} transfer blob completed {} {} {}",
                                 connection_id, hash, index, size
                             ),
-                        })
+                        }))
                         .await
                 }
                 provider::Event::TransferCompleted {
@@ -54,16 +63,16 @@ impl CustomEventSender for SendStatus {
                     ..
                 } => {
                     sender
-                        .send(SendEvent {
+                        .send(Event::Send(SendEvent {
                             message: format!("{} transfer completed {:?}", connection_id, stats),
-                        })
+                        }))
                         .await
                 }
                 provider::Event::TransferAborted { connection_id, .. } => {
                     sender
-                        .send(SendEvent {
+                        .send(Event::Send(SendEvent {
                             message: format!("{} transfer aborted", connection_id),
-                        })
+                        }))
                         .await
                 }
                 _ => Ok(()), // For unhandled events, return Ok
@@ -75,5 +84,5 @@ impl CustomEventSender for SendStatus {
         }) as Boxed<()>
     }
 
-    fn try_send(&self, event: provider::Event) {}
+    fn try_send(&self, _event: provider::Event) {}
 }

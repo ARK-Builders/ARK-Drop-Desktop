@@ -16,3 +16,5 @@ vite.config.ts.timestamp-*
 
 .drop-send-*
 .drop-get-*
+
+files

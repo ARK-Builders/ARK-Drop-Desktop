@@ -5,7 +5,7 @@ pub mod send;
 use std::collections::BTreeMap;
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result};
 use error::IrohError;
 use futures_buffered::join_all;
 use futures_lite::StreamExt;
@@ -20,7 +20,7 @@ use iroh_blobs::{
     Hash, Tag,
 };
 use metadata::{CollectionMetadata, FileTransfer};
-use send::{SendEvent, SendStatus};
+use send::{Event, SendStatus};
 use tokio::sync::mpsc::Sender;
 
 fn get_or_create_secret() -> anyhow::Result<SecretKey> {
@@ -36,7 +36,7 @@ pub struct IrohInstance {
 }
 
 impl IrohInstance {
-    pub async fn sender(sender: Arc<Sender<SendEvent>>) -> Result<Self> {
+    pub async fn sender(sender: Arc<Sender<Event>>) -> Result<Self> {
         let secret_key = get_or_create_secret()?;
 
         let endpoint = Endpoint::builder()
@@ -86,7 +86,6 @@ impl IrohInstance {
         tx: Sender<Vec<FileTransfer>>,
     ) -> Result<(Blobs<iroh_blobs::store::mem::Store>, Collection)> {
         let ticket = BlobTicket::from_str(&ticket)?;
-        let addr = ticket.node_addr().clone();
         let secret_key = get_or_create_secret()?;
 
         let endpoint = Endpoint::builder()
@@ -311,7 +310,7 @@ mod tests {
     async fn test_receive_files() -> Result<()> {
         tracing_subscriber::fmt::init();
         let files = vec!["Cargo.toml".to_string()];
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<SendEvent>(32);
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<Event>(32);
 
         tokio::spawn(async move {
             while let Some(event) = rx.recv().await {

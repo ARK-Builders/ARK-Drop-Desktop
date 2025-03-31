@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, Result};
 use drop_core::metadata::FileTransfer;
-use drop_core::send::SendEvent;
+use drop_core::send::Event;
 use drop_core::IrohInstance;
 use iroh_blobs::ticket::BlobTicket;
 use iroh_blobs::BlobFormat;
@@ -20,14 +20,9 @@ struct AppState {
     instance: IrohInstance,
 }
 
-enum Event {
-    Files(Vec<FileTransfer>),
-}
-
 impl AppState {
     async fn new(async_proc_input_tx: mpsc::Sender<Event>) -> Result<Self> {
-        let (tx, _rx) = tokio::sync::mpsc::channel::<SendEvent>(32);
-        let instance = IrohInstance::sender(Arc::new(tx))
+        let instance = IrohInstance::sender(Arc::new(async_proc_input_tx.clone()))
             .await
             .map_err(|e| anyhow!("Failed to create sender: {}", e))?;
 
@@ -110,6 +105,11 @@ fn event_handler(message: Event, manager: &AppHandle) {
         Event::Files(progress) => {
             if let Err(e) = manager.emit("download_progress", &progress) {
                 eprintln!("Failed to emit download_progress event: {:?}", e);
+            }
+        }
+        Event::Send(sender) => {
+            if let Err(e) = manager.emit("sender_progress", &sender) {
+                eprintln!("Failed to emit sender_progress event: {:?}", e);
             }
         }
     }
