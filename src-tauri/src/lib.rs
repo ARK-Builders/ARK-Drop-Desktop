@@ -17,7 +17,7 @@ use tokio::sync::Mutex;
 
 struct AppState {
     inner: Mutex<mpsc::Sender<Event>>,
-    sender: IrohInstance,
+    instance: IrohInstance,
 }
 
 enum Event {
@@ -27,13 +27,13 @@ enum Event {
 impl AppState {
     async fn new(async_proc_input_tx: mpsc::Sender<Event>) -> Result<Self> {
         let (tx, _rx) = tokio::sync::mpsc::channel::<SendEvent>(32);
-        let sender = IrohInstance::sender(Arc::new(tx))
+        let instance = IrohInstance::sender(Arc::new(tx))
             .await
             .map_err(|e| anyhow!("Failed to create sender: {}", e))?;
 
         Ok(AppState {
             inner: Mutex::new(async_proc_input_tx),
-            sender,
+            instance,
         })
     }
 }
@@ -127,7 +127,7 @@ async fn generate_ticket(
     paths: Vec<String>,
 ) -> Result<BlobTicket, InvokeError> {
     state
-        .sender
+        .instance
         .send_files(paths)
         .await
         .map_err(|e| InvokeError::from_anyhow(anyhow!("Failed to generate ticket: {}", e)))
@@ -159,13 +159,28 @@ async fn receive_files(
     std::fs::create_dir_all(&outpath)
         .map_err(|e| InvokeError::from_anyhow(anyhow!("Failed to create directory: {}", e)))?;
 
-    let _files = IrohInstance::receive_files(ticket, tx)
+    let (blobs, collection) = IrohInstance::receive_files(ticket, tx)
         .await
         .map_err(|e| InvokeError::from_anyhow(anyhow!("Failed to receive files: {}", e)))?;
 
     handle
         .await
         .map_err(|e| InvokeError::from_anyhow(anyhow!("Failed to await handle: {}", e)))?;
+
+    for (name, hash) in collection.iter() {
+        let file_path = outpath.join(name);
+
+        match blobs.client().read_to_bytes(*hash).await {
+            Ok(bytes) => {
+                if let Err(e) = std::fs::write(&file_path, bytes) {
+                    eprintln!("Failed to write file {}: {}", name, e);
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to read file {}: {}", name, e);
+            }
+        }
+    }
 
     outpath
         .to_str()

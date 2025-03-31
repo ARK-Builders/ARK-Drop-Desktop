@@ -84,7 +84,7 @@ impl IrohInstance {
     pub async fn receive_files(
         ticket: String,
         tx: Sender<Vec<FileTransfer>>,
-    ) -> Result<Collection> {
+    ) -> Result<(Blobs<iroh_blobs::store::mem::Store>, Collection)> {
         let ticket = BlobTicket::from_str(&ticket)?;
         let addr = ticket.node_addr().clone();
         let secret_key = get_or_create_secret()?;
@@ -166,7 +166,9 @@ impl IrohInstance {
                     tx.send(files.clone())
                         .await
                         .map_err(|_| IrohError::SendError)?;
-                    return Ok(collection.into());
+
+                    break;
+                    // return Ok((blobs, collection.into()));
                 }
 
                 DownloadProgress::Done { id } => {
@@ -240,7 +242,8 @@ impl IrohInstance {
             .get_collection(ticket.hash())
             .await
             .map_err(|e| IrohError::DownloadError(e.to_string()))?;
-        Ok(collection.into())
+
+        Ok((blobs, collection.into()))
     }
 
     pub async fn import_collection(&self, paths: Vec<PathBuf>) -> Result<(Hash, Tag)> {
