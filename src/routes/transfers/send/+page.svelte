@@ -166,7 +166,7 @@
 				All files were successfully transferred to the client.
 			</p>
 			<button
-				on:click={() = >{
+				on:click={() => {
 					goto('/transfers');
 				}}
 				class="mt-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-600"
