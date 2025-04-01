@@ -39,13 +39,13 @@
 			status = 'transferring';
 			connected = true;
 			messages = [...messages, `Client connected`];
-			transferredBlobs = 0; 
+			transferredBlobs = 0;
 		} else if (action.startsWith('transfer blob completed')) {
 			transferredBlobs += 1;
 			messages = [...messages, 'Blob transferred'];
 		} else if (action.startsWith('transfer completed')) {
 			status = 'completed';
-			transferredBlobs = totalBlobs; 
+			transferredBlobs = totalBlobs;
 			messages = [...messages, 'Transfer completed'];
 		} else if (action === 'transfer aborted') {
 			status = 'aborted';
@@ -91,28 +91,166 @@
 				{/if}
 			</div>
 			<span class="flex items-center gap-2 font-medium text-gray-modern-900">
-				<div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-900"></div>
-				Waiting to connect...
+				Waiting to connect
+				<span class="ellipsis-animation"></span>
 			</span>
 			{#if hashCode}
 				<HashCode {hashCode} />
 			{/if}
 		</div>
 	{:else if status === 'transferring'}
-		<div class="flex flex-col items-center gap-4">
-			<span class="font-medium text-gray-modern-900">Connected to client</span>
-			<progress value={transferredBlobs} max={totalBlobs} class="w-64 h-4 rounded"></progress>
-			<span class="font-medium text-gray-modern-900">
-				{transferredBlobs} of {totalBlobs} files transferred
-			</span>
+		<div class="flex w-full max-w-md flex-col items-center gap-6 bg-white p-6">
+			<div class="flex w-full items-center gap-3">
+				<div
+					class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-50"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-5 w-5 text-blue-500"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+						/>
+					</svg>
+				</div>
+				<div class="flex-grow">
+					<h3 class="font-medium text-gray-900">
+						Transfer in progress <span class="ellipsis-animation"></span>
+					</h3>
+					<p class="text-sm text-gray-500">Connected to client</p>
+				</div>
+			</div>
+
+			<div class="w-full space-y-2">
+				<div class="flex justify-between text-sm font-medium text-gray-700">
+					<span>Progress</span>
+					<span>{Math.round((transferredBlobs / totalBlobs) * 100)}%</span>
+				</div>
+				<div class="h-2.5 w-full rounded-full bg-gray-100">
+					<div
+						class="h-2.5 rounded-full bg-blue-500 transition-all duration-300 ease-out"
+						style="width: {Math.round((transferredBlobs / totalBlobs) * 100)}%"
+					></div>
+				</div>
+				<p class="text-right text-xs text-gray-500">
+					{transferredBlobs} of {totalBlobs} files transferred
+				</p>
+			</div>
 		</div>
 	{:else if status === 'completed'}
-		<div class="flex flex-col items-center gap-4">
-			<span class="font-medium text-green-600">Transfer completed successfully!</span>
+		<div class="flex w-full max-w-md flex-col items-center gap-4 rounded-xl bg-white p-8">
+			<div class="flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-8 w-8 text-green-500"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M5 13l4 4L19 7"
+					/>
+				</svg>
+			</div>
+			<h3 class="text-lg font-medium text-gray-900">Transfer complete!</h3>
+			<p class="text-center text-sm text-gray-500">
+				All files were successfully transferred to the client.
+			</p>
+			<button
+				on:click={() = >{
+					goto('/transfers');
+				}}
+				class="mt-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-600"
+			>
+				Done
+			</button>
 		</div>
 	{:else if status === 'aborted'}
-		<div class="flex flex-col items-center gap-4">
-			<span class="font-medium text-red-600">Transfer aborted.</span>
+		<div class="flex w-full max-w-md flex-col items-center gap-4 rounded-xl bg-white p-8">
+			<div class="flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-8 w-8 text-red-500"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M6 18L18 6M6 6l12 12"
+					/>
+				</svg>
+			</div>
+			<h3 class="text-lg font-medium text-gray-900">Transfer aborted</h3>
+			<p class="text-center text-sm text-gray-500">
+				The file transfer was interrupted or canceled.
+			</p>
+			<div class="mt-2 flex gap-3">
+				<button
+					on:click={() => {
+						goto('/transfers');
+					}}
+					class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
+				>
+					Close
+				</button>
+			</div>
 		</div>
 	{/if}
 </div>
+
+<style>
+	.loading-ellipsis span {
+		opacity: 0;
+	}
+	.animate-bounce {
+		animation: bounce 1.5s infinite;
+	}
+	.animation-delay-100 {
+		animation-delay: 0.2s;
+	}
+	.animation-delay-200 {
+		animation-delay: 0.4s;
+	}
+	@keyframes bounce {
+		0%,
+		100% {
+			transform: translateY(0);
+			opacity: 0.8;
+		}
+		50% {
+			transform: translateY(-3px);
+			opacity: 1;
+		}
+	}
+
+	.ellipsis-animation:after {
+		content: '...';
+		animation: ellipsis 1.5s infinite;
+		display: inline-block;
+		width: 1.5em;
+		text-align: left;
+	}
+	@keyframes ellipsis {
+		0% {
+			content: '.';
+		}
+		50% {
+			content: '..';
+		}
+		100% {
+			content: '...';
+		}
+	}
+</style>
