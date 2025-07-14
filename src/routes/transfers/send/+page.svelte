@@ -28,30 +28,34 @@
 		confirmationCode = getConfirmationCode(hashCode);
 	});
 
-	listen('sender_progress', (event: Event<{ message: string }>) => {
-		const message = event.payload.message;
-		const parts = message.split(' ');
-		const conn_id = parts[0];
-		const action = parts.slice(1).join(' ');
-
-		if (action === 'client connected') {
-			connection_id = conn_id;
-			status = 'transferring';
-			connected = true;
-			messages = [...messages, `Client connected`];
-			transferredBlobs = 0;
-		} else if (action.startsWith('transfer blob completed')) {
-			transferredBlobs += 1;
-			messages = [...messages, 'Blob transferred'];
-		} else if (action.startsWith('transfer completed')) {
-			status = 'completed';
-			transferredBlobs = totalBlobs;
-			messages = [...messages, 'Transfer completed'];
-		} else if (action === 'transfer aborted') {
-			status = 'aborted';
-			messages = [...messages, 'Transfer aborted'];
-		}
+	listen('send_progress', (event: any) => {
+		console.log('SEND', event);
 	});
+
+	// listen('sender_progress', (event: Event<{ message: string }>) => {
+	// 	const message = event.payload.message;
+	// 	const parts = message.split(' ');
+	// 	const conn_id = parts[0];
+	// 	const action = parts.slice(1).join(' ');
+
+	// 	if (action === 'client connected') {
+	// 		connection_id = conn_id;
+	// 		status = 'transferring';
+	// 		connected = true;
+	// 		messages = [...messages, `Client connected`];
+	// 		transferredBlobs = 0;
+	// 	} else if (action.startsWith('transfer blob completed')) {
+	// 		transferredBlobs += 1;
+	// 		messages = [...messages, 'Blob transferred'];
+	// 	} else if (action.startsWith('transfer completed')) {
+	// 		status = 'completed';
+	// 		transferredBlobs = totalBlobs;
+	// 		messages = [...messages, 'Transfer completed'];
+	// 	} else if (action === 'transfer aborted') {
+	// 		status = 'aborted';
+	// 		messages = [...messages, 'Transfer aborted'];
+	// 	}
+	// });
 </script>
 
 <header class="my-2 flex flex-row justify-between px-4 py-2">

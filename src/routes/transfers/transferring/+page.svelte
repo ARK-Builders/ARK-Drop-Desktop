@@ -27,9 +27,12 @@
 			time_complete = Date.now() - start;
 			done = true;
 		} catch (error) {
-			console.error("ERROR:", error)
+			console.error('ERROR:', error);
 		}
+	});
 
+	listen('receive_progress', (event: any) => {
+		console.log('RECEIVE', event);
 	});
 
 	listen('download_progress', (event) => {

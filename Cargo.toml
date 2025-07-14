@@ -1,11 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["core", "src-tauri", "uniffi-bingen"]
+members = ["core", "src-tauri"]
 
 [workspace.dependencies]
-iroh = { version = "0.33.0", features = ["discovery-local-network"] }
-iroh-blobs = { version = "0.33.0", features = ["net_protocol", "rpc"] }
-iroh-base = "0.33.0"
+iroh-blobs = { version = "0.90" }
+iroh = "0.90"
 
 anyhow = "1.0.86"
 thiserror = "1.0.61"

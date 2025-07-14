@@ -27,7 +27,6 @@ tauri-plugin-clipboard-manager = "2.0.0-alpha.2"
 drop_core = { path = "../core" }
 
 iroh-blobs = { workspace = true }
-iroh-base = { workspace = true }
 anyhow = { workspace = true }
 tracing-subscriber = { workspace = true }
 

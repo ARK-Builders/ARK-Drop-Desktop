@@ -1,136 +1,112 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use drop_core::{self, receive_file, send_file, ReceiveProgress, SendProgress, ShutdownHandle};
+
 use anyhow::{anyhow, Result};
-use drop_core::metadata::FileTransfer;
-use drop_core::send::Event;
-use drop_core::IrohInstance;
-use iroh_blobs::ticket::BlobTicket;
-use iroh_blobs::BlobFormat;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::{path::PathBuf, vec};
 use tauri::ipc::InvokeError;
-use tauri::{generate_context, generate_handler, AppHandle, Emitter, Manager};
-use tokio::sync::mpsc;
-use tokio::sync::Mutex;
+use tauri::{AppHandle, Emitter, Manager};
+use tokio::sync::{mpsc, Mutex};
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "type", content = "payload")]
+enum AppEvent {
+    Send(SendProgress),
+    Receive(ReceiveProgress),
+}
 
 struct AppState {
-    inner: Mutex<mpsc::Sender<Event>>,
-    instance: IrohInstance,
+    progress_emitter: mpsc::Sender<AppEvent>,
+    shutdown_handle: Arc<Mutex<Option<ShutdownHandle>>>,
 }
 
 impl AppState {
-    async fn new(async_proc_input_tx: mpsc::Sender<Event>) -> Result<Self> {
-        let instance = IrohInstance::sender(Arc::new(async_proc_input_tx.clone()))
-            .await
-            .map_err(|e| anyhow!("Failed to create sender: {}", e))?;
-
-        Ok(AppState {
-            inner: Mutex::new(async_proc_input_tx),
-            instance,
-        })
+    fn new(progress_emitter: mpsc::Sender<AppEvent>) -> Self {
+        Self {
+            progress_emitter,
+            shutdown_handle: Arc::new(Mutex::new(None)),
+        }
     }
-}
-
-async fn setup<R: tauri::Runtime>(
-    handle: &tauri::AppHandle<R>,
-    async_proc_input_tx: mpsc::Sender<Event>,
-) -> Result<()> {
-    let state = AppState::new(async_proc_input_tx)
-        .await
-        .map_err(|e| anyhow!("Failed to initialize app state: {}", e))?;
-    handle.manage(state);
-    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let (async_proc_input_tx, async_proc_input_rx) = mpsc::channel(1);
-    let (async_proc_output_tx, mut async_proc_output_rx) = mpsc::channel(1);
+    let (progress_tx, progress_rx) = mpsc::channel(32);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {
+        .setup(move |app| {
+            app.manage(AppState::new(progress_tx));
+
             let handle = app.handle().clone();
-
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = async_process_model(async_proc_input_rx, async_proc_output_tx).await
-                {
-                    eprintln!("Async process model failed: {:?}", e);
-                }
-            });
-
-            tauri::async_runtime::spawn(async move {
-                if let Err(err) = setup(&handle, async_proc_input_tx).await {
-                    eprintln!("Setup failed: {:?}", err);
-                }
-
-                while let Some(output) = async_proc_output_rx.recv().await {
-                    event_handler(output, &handle);
-                }
+                async_process_model(progress_rx, handle).await;
             });
 
             Ok(())
         })
-        .invoke_handler(generate_handler![
+        .invoke_handler(tauri::generate_handler![
             generate_ticket,
             receive_files,
+            cancel_send,
             open_directory,
             is_valid_ticket,
-            get_env
         ])
-        .run(generate_context!())
-        .map_err(|e| eprintln!("Error while running tauri application: {:?}", e))
-        .ok();
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
 
-async fn async_process_model(
-    mut input_rx: mpsc::Receiver<Event>,
-    output_tx: mpsc::Sender<Event>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    while let Some(input) = input_rx.recv().await {
-        output_tx
-            .send(input)
-            .await
-            .map_err(|e| anyhow!("Failed to send output: {}", e))?;
-    }
-    Ok(())
-}
-
-fn event_handler(message: Event, manager: &AppHandle) {
-    match message {
-        Event::Files(progress) => {
-            if let Err(e) = manager.emit("download_progress", &progress) {
-                eprintln!("Failed to emit download_progress event: {:?}", e);
-            }
-        }
-        Event::Send(sender) => {
-            if let Err(e) = manager.emit("sender_progress", &sender) {
-                eprintln!("Failed to emit sender_progress event: {:?}", e);
-            }
-        }
+async fn async_process_model(mut progress_rx: mpsc::Receiver<AppEvent>, handle: AppHandle) {
+    while let Some(event) = progress_rx.recv().await {
+        event_handler(event, &handle);
     }
 }
 
-#[tauri::command]
-fn get_env(key: &str) -> Result<String, InvokeError> {
-    std::env::var(key)
-        .map_err(|e| InvokeError::from_anyhow(anyhow!("Failed to get env var: {}", e)))
+fn event_handler(event: AppEvent, manager: &AppHandle) {
+    let (event_name, payload) = match event {
+        AppEvent::Send(progress) => ("send_progress", serde_json::to_value(progress).unwrap()),
+        AppEvent::Receive(progress) => {
+            ("receive_progress", serde_json::to_value(progress).unwrap())
+        }
+    };
+
+    if let Err(e) = manager.emit(event_name, payload) {
+        eprintln!("Failed to emit event '{}': {:?}", event_name, e);
+    }
 }
 
 #[tauri::command]
 async fn generate_ticket(
     state: tauri::State<'_, AppState>,
     paths: Vec<String>,
-) -> Result<BlobTicket, InvokeError> {
-    state
-        .instance
-        .send_files(paths)
-        .await
-        .map_err(|e| InvokeError::from_anyhow(anyhow!("Failed to generate ticket: {}", e)))
+) -> Result<String, InvokeError> {
+    let path_str = paths.first().ok_or_else(|| {
+        InvokeError::from_anyhow(anyhow!("No path provided to generate a ticket."))
+    })?;
+    let path = PathBuf::from(path_str);
+
+    let (tx, mut rx) = mpsc::channel(32);
+
+    let main_emitter = state.progress_emitter.clone();
+    tauri::async_runtime::spawn(async move {
+        while let Some(progress) = rx.recv().await {
+            main_emitter.send(AppEvent::Send(progress)).await.ok();
+        }
+    });
+
+    match send_file(path, tx).await {
+        Ok((ticket, handle)) => {
+            let mut shutdown_guard = state.shutdown_handle.lock().await;
+            *shutdown_guard = Some(handle);
+            Ok(ticket)
+        }
+        Err(e) => Err(InvokeError::from_anyhow(e)),
+    }
 }
 
 #[tauri::command]
@@ -138,65 +114,45 @@ async fn receive_files(
     state: tauri::State<'_, AppState>,
     ticket: String,
 ) -> Result<String, InvokeError> {
-    let async_proc_input_tx = state.inner.lock().await.clone();
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<FileTransfer>>(2);
+    let (tx, mut rx) = mpsc::channel(32);
 
-    let handle = tokio::spawn(async move {
-        while let Some(files) = rx.recv().await {
-            if let Err(e) = async_proc_input_tx.send(Event::Files(files)).await {
-                eprintln!("Failed to send files event: {:?}", e);
-                break;
-            }
+    let main_emitter = state.progress_emitter.clone();
+    tauri::async_runtime::spawn(async move {
+        while let Some(progress) = rx.recv().await {
+            main_emitter.send(AppEvent::Receive(progress)).await.ok();
         }
     });
 
-    let outpath = dirs::download_dir().unwrap_or_else(|| {
-        std::env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .join("files")
-    });
-
-    std::fs::create_dir_all(&outpath)
-        .map_err(|e| InvokeError::from_anyhow(anyhow!("Failed to create directory: {}", e)))?;
-
-    let (blobs, collection) = IrohInstance::receive_files(ticket, tx)
+    receive_file(ticket, tx)
         .await
-        .map_err(|e| InvokeError::from_anyhow(anyhow!("Failed to receive files: {}", e)))?;
+        .map_err(InvokeError::from_anyhow)
+}
 
-    handle
-        .await
-        .map_err(|e| InvokeError::from_anyhow(anyhow!("Failed to await handle: {}", e)))?;
-
-    for (name, hash) in collection.iter() {
-        let file_path = outpath.join(name);
-
-        match blobs.client().read_to_bytes(*hash).await {
-            Ok(bytes) => {
-                if let Err(e) = std::fs::write(&file_path, bytes) {
-                    eprintln!("Failed to write file {}: {}", name, e);
-                }
-            }
-            Err(e) => {
-                eprintln!("Failed to read file {}: {}", name, e);
-            }
-        }
+#[tauri::command]
+async fn cancel_send(state: tauri::State<'_, AppState>) -> Result<(), InvokeError> {
+    let mut shutdown_guard = state.shutdown_handle.lock().await;
+    if let Some(handle) = shutdown_guard.take() {
+        // Dropping the handle sends the shutdown signal.
+        drop(handle);
+        println!("Send operation cancelled.");
+    } else {
+        eprintln!("No active send operation to cancel.");
     }
-
-    outpath
-        .to_str()
-        .ok_or_else(|| InvokeError::from_anyhow(anyhow!("Failed to convert path to string")))
-        .map(|s| s.to_owned())
+    Ok(())
 }
 
 #[tauri::command]
 fn open_directory(directory: PathBuf) -> Result<(), InvokeError> {
-    open::that(directory)
-        .map_err(|e| InvokeError::from_anyhow(anyhow!("Failed to open directory: {}", e)))
+    open::that(&directory).map_err(|e| {
+        InvokeError::from_anyhow(anyhow!(
+            "Failed to open directory '{}': {}",
+            directory.display(),
+            e
+        ))
+    })
 }
 
 #[tauri::command]
-fn is_valid_ticket(ticket: String) -> Result<bool, InvokeError> {
-    let ticket = BlobTicket::from_str(&ticket)
-        .map_err(|e| InvokeError::from_anyhow(anyhow!("Failed to parse ticket: {}", e)))?;
-    Ok(ticket.format() == BlobFormat::HashSeq)
+fn is_valid_ticket(ticket: String) -> bool {
+    iroh_blobs::ticket::BlobTicket::from_str(&ticket).is_ok()
 }

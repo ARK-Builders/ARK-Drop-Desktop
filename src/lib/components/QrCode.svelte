@@ -1,6 +1,5 @@
 <script lang="ts">
 	import QrCode from 'qrcode';
-	import { onMount } from 'svelte';
 
 	export let hashCode: string | undefined;
 
@@ -10,7 +9,7 @@
 
 	$: if (canvas && hashCode) {
 		QrCode.toCanvas(canvas, hashCode, {
-			scale: 5
+			scale: 3.6
 		})
 			.then(() => {
 				loading = false;

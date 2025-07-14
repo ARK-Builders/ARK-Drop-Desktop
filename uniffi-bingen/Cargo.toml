@@ -1,8 +1,0 @@
-[package]
-name = "uniffi-bingen"
-version = "0.1.0"
-edition = "2021"
-
-
-[dependencies]
-uniffi = { version = "0.28.0", features = ["cli"] }
