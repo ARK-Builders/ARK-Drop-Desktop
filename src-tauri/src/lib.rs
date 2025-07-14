@@ -4,6 +4,7 @@
 use drop_core::{self, receive_file, send_file, ReceiveProgress, SendProgress, ShutdownHandle};
 
 use anyhow::{anyhow, Result};
+use iroh::protocol::Router;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -21,6 +22,7 @@ enum AppEvent {
 struct AppState {
     progress_emitter: mpsc::Sender<AppEvent>,
     shutdown_handle: Arc<Mutex<Option<ShutdownHandle>>>,
+    router: Arc<Mutex<Option<Router>>>,
 }
 
 impl AppState {
@@ -28,6 +30,7 @@ impl AppState {
         Self {
             progress_emitter,
             shutdown_handle: Arc::new(Mutex::new(None)),
+            router: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -99,7 +102,7 @@ async fn generate_ticket(
         }
     });
 
-    match send_file(path, tx).await {
+    match send_file(path, tx, state.router.clone()).await {
         Ok((ticket, handle)) => {
             let mut shutdown_guard = state.shutdown_handle.lock().await;
             *shutdown_guard = Some(handle);
@@ -131,6 +134,8 @@ async fn receive_files(
 #[tauri::command]
 async fn cancel_send(state: tauri::State<'_, AppState>) -> Result<(), InvokeError> {
     let mut shutdown_guard = state.shutdown_handle.lock().await;
+    let mut router_guard = state.router.lock().await;
+
     if let Some(handle) = shutdown_guard.take() {
         // Dropping the handle sends the shutdown signal.
         drop(handle);
@@ -138,6 +143,16 @@ async fn cancel_send(state: tauri::State<'_, AppState>) -> Result<(), InvokeErro
     } else {
         eprintln!("No active send operation to cancel.");
     }
+
+    if let Some(router) = router_guard.take() {
+        router
+            .shutdown()
+            .await
+            .map_err(|err| InvokeError::from_anyhow(anyhow!("Router shutdown failed: {}", err)))?;
+    } else {
+        eprintln!("No active router to shut down.");
+    }
+
     Ok(())
 }
 

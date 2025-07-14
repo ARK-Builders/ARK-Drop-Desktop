@@ -1,14 +1,14 @@
 use std::{
     path::{Component, Path, PathBuf},
     str::FromStr,
+    sync::Arc,
 };
 
 use anyhow::Context;
 use data_encoding::HEXLOWER;
 use futures_buffered::BufferedStreamExt;
 use futures_lite::stream::StreamExt;
-use iroh::Watcher;
-use iroh::{Endpoint, RelayMode, SecretKey};
+use iroh::{protocol::Router, Endpoint, RelayMode, SecretKey, Watcher};
 use iroh_blobs::{
     api::{
         blobs::{
@@ -30,13 +30,12 @@ use serde::{Deserialize, Serialize};
 use std::iter::Iterator;
 use tokio::{
     select,
-    sync::{mpsc, oneshot},
+    sync::{mpsc, oneshot, Mutex},
 };
 use tracing::{error, trace};
 use walkdir::WalkDir;
 
 // --- Public API ---
-
 // Progress updates for the `send_file` operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SendProgress {
@@ -125,6 +124,7 @@ impl Drop for ShutdownHandle {
 // # Arguments
 // * `path`: The path to the file or directory to send.
 // * `updates`: An `mpsc::Sender` to send `SendProgress` updates to.
+// * `router_storage`: A mutex to store the router, ensuring it persists.
 //
 // # Returns
 // A `Result` containing:
@@ -133,6 +133,7 @@ impl Drop for ShutdownHandle {
 pub async fn send_file(
     path: PathBuf,
     updates: mpsc::Sender<SendProgress>,
+    router_storage: Arc<Mutex<Option<Router>>>,
 ) -> anyhow::Result<(String, ShutdownHandle)> {
     let (ticket_tx, ticket_rx) = oneshot::channel();
     let (shutdown_tx, mut shutdown_rx) = oneshot::channel();
@@ -167,7 +168,10 @@ pub async fn send_file(
                 .accept(iroh_blobs::ALPN, blobs.clone())
                 .spawn();
 
-            // Wait for the endpoint to be ready before creating a ticket.
+            let mut router_guard = router_storage.lock().await;
+            *router_guard = Some(router.clone());
+            drop(router_guard);
+
             let _ = router.endpoint().home_relay().initialized().await?;
 
             let (tag, size, _collection) = import(path.clone(), blobs.store(), &updates).await?;
@@ -297,9 +301,6 @@ pub async fn receive_file(
         let hash_and_format = ticket.hash_and_format();
 
         updates.send(ReceiveProgress::Connecting).await?;
-        let connection = endpoint
-            .connect(ticket.node_addr().clone(), iroh_blobs::protocol::ALPN)
-            .await?;
         let connection = endpoint
             .connect(ticket.node_addr().clone(), iroh_blobs::protocol::ALPN)
             .await?;

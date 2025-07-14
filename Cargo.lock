@@ -108,6 +108,7 @@ dependencies = [
  "anyhow",
  "dirs 5.0.1",
  "drop_core",
+ "iroh",
  "iroh-blobs",
  "open",
  "serde",
