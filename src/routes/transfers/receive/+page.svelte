@@ -3,11 +3,12 @@
 	import ChevronLeft from '$lib/components/icons/ChevronLeft.svelte';
 	import { onMount } from 'svelte';
 	import QrScanner from 'qr-scanner';
+	import { invoke } from '@tauri-apps/api';
 	import ChevronUp from '$lib/components/icons/ChevronUp.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import XClose from '$lib/components/icons/XClose.svelte';
 	import Clipboard from '$lib/components/icons/Clipboard.svelte';
-	import { readText } from '@tauri-apps/plugin-clipboard-manager';
+	import { readText } from '@tauri-apps/api/clipboard';
 
 	let videoSource: HTMLVideoElement | null = null;
 	let loading = false;

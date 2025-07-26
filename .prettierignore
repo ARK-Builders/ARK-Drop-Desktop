@@ -1,12 +1,4 @@
-.env*
-build
-target
-package
-.vscode
-.DS_Store
-.svelte-kit
-node_modules
-
+# Ignore files for PNPM, NPM and YARN
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
