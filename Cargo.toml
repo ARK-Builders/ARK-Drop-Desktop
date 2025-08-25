@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["core", "src-tauri", "uniffi-bingen"]
+members = ["core", "src-tauri"]
 
 [workspace.dependencies]
 iroh = "0.22.0"
@@ -17,3 +17,4 @@ rand = "0.8.5"
 tokio = { version = "1.37.0", features = ["full"] }
 tokio-util = "0.7.11"
 bytes = "1.6.0"
+postcard = "1.0.8"

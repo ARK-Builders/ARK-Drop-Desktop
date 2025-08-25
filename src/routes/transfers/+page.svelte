@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { open } from '@tauri-apps/api/dialog';
+	import { open } from '@tauri-apps/plugin-dialog';
 
 	import NavBar from '$lib/components/NavBar.svelte';
 	import ArrowCircleBrokenDown from '$lib/components/icons/ArrowCircleBrokenDown.svelte';
