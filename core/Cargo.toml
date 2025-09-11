@@ -18,4 +18,3 @@ futures-buffered = { workspace = true }
 futures-lite = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
-postcard = { workspace = true }
