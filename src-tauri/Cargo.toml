@@ -1,7 +1,7 @@
 [package]
 name = "ark-drop"
 version = "0.1.0"
-description = "A Tauri App"
+description = "An app to sync files between devices"
 authors = ["you"]
 edition = "2021"
 
