@@ -1,6 +1,10 @@
 export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}
+	content: ['./src/**/*.{html,js,svelte,ts}'],
+	theme: {
+		extend: {}
+	},
+	plugins: {
+		tailwindcss: {},
+		autoprefixer: {}
+	}
+};

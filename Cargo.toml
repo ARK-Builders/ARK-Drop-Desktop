@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["core", "src-tauri", "uniffi-bingen"]
+members = ["core", "src-tauri"]
 
 [workspace.dependencies]
 iroh = "0.22.0"

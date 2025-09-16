@@ -1,7 +1,6 @@
-pub mod erorr;
-pub mod metadata;
+pub mod error;
 
-use erorr::{IrohError, IrohResult};
+use error::{IrohError, IrohResult};
 use futures_buffered::try_join_all;
 use futures_lite::stream::StreamExt;
 use iroh::{
@@ -10,10 +9,8 @@ use iroh::{
 };
 use iroh_base::ticket::BlobTicket;
 use iroh_blobs::{
-    format::collection::Collection, get::db::DownloadProgress, hashseq::HashSeq,
-    util::SetTagOption, BlobFormat,
+    format::collection::Collection, get::db::DownloadProgress, util::SetTagOption, BlobFormat,
 };
-use metadata::CollectionMetadata;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::{
@@ -24,66 +21,22 @@ use std::{
 };
 use std::{path::PathBuf, str::FromStr};
 
-uniffi::setup_scaffolding!();
-
-#[derive(uniffi::Object)]
 pub struct IrohNode(pub Node<iroh_blobs::store::mem::Store>);
 
-#[derive(uniffi::Object)]
 pub struct IrohInstance {
     node: Arc<IrohNode>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FileTransfer {
     pub name: String,
     pub transferred: u64,
     pub total: u64,
 }
 
-uniffi::custom_type!(PathBuf, String);
-
-impl UniffiCustomTypeConverter for PathBuf {
-    type Builtin = String;
-
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-        Ok(PathBuf::from(val))
-    }
-
-    fn from_custom(obj: Self) -> Self::Builtin {
-        obj.to_string_lossy().to_string()
-    }
-}
-
-uniffi::custom_type!(BlobTicket, String);
-
-impl UniffiCustomTypeConverter for BlobTicket {
-    type Builtin = String;
-
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-        Ok(BlobTicket::from_str(&val)?)
-    }
-
-    fn from_custom(obj: Self) -> Self::Builtin {
-        obj.to_string()
-    }
-}
-
-#[derive(uniffi::Object)]
-pub struct DropCollection(pub Collection);
-
-impl From<Collection> for DropCollection {
-    fn from(collection: Collection) -> Self {
-        Self(collection)
-    }
-}
-
-#[derive(uniffi::Object)]
 pub struct FileTransferHandle(pub Sender<Vec<FileTransfer>>);
 
-#[uniffi::export]
 impl IrohInstance {
-    #[uniffi::constructor]
     pub async fn new() -> IrohResult<Self> {
         let node = Node::memory()
             .spawn()
@@ -98,16 +51,9 @@ impl IrohInstance {
         self.node.clone()
     }
 
-    /// Accepts a list of file paths.
-    ///
-    /// Returns a `BlobTicket`, which is a string that
-    /// can be used to retrieve the files from another node.
     pub async fn send_files(&self, files: Vec<PathBuf>) -> IrohResult<BlobTicket> {
-        // Import a series of blobs from the file system paths
         let outcomes = import_blobs(self, files).await?;
 
-        // A series of blobs is the same as a collection,
-        // but we need to convert the structure slightly to implicitly create it
         let collection = outcomes
             .into_iter()
             .map(|(path, outcome)| {
@@ -122,7 +68,6 @@ impl IrohInstance {
             })
             .collect();
 
-        // we now also import this collection into the node
         let (hash, _) = self
             .node
             .0
@@ -131,7 +76,6 @@ impl IrohInstance {
             .await
             .map_err(|e| IrohError::NodeError(e.to_string()))?;
 
-        // We can now generate a ticket from this collection
         self.node
             .0
             .blobs()
@@ -140,22 +84,17 @@ impl IrohInstance {
             .map_err(|e| IrohError::NodeError(e.to_string()))
     }
 
-    /// Accepts a `BlobTicket` and a `FileTransferHandle`
-    /// (a channel to send progress updates to the client)
-    ///
-    /// Returns a `DropCollection` (a wrapper around a collection).
     pub async fn receive_files(
         &self,
         ticket: String,
         handle_chunk: Arc<FileTransferHandle>,
-    ) -> IrohResult<DropCollection> {
+    ) -> IrohResult<Collection> {
         let ticket = BlobTicket::from_str(&ticket).map_err(|_| IrohError::InvalidTicket)?;
 
         if ticket.format() != BlobFormat::HashSeq {
             return Err(IrohError::UnsupportedFormat);
         }
 
-        // Download the collection from the node
         let mut download_stream = self
             .node
             .0
@@ -164,8 +103,6 @@ impl IrohInstance {
             .await
             .map_err(|e| IrohError::DownloadError(e.to_string()))?;
 
-        let mut curr_metadata: Option<CollectionMetadata> = None;
-        let mut curr_hashseq: Option<HashSeq> = None;
         let mut files: Vec<FileTransfer> = Vec::new();
 
         let mut map: BTreeMap<u64, String> = BTreeMap::new();
@@ -173,10 +110,6 @@ impl IrohInstance {
         let debug_log = std::env::var("DROP_DEBUG_LOG").is_ok();
         let temp_dir = std::env::temp_dir();
 
-        println!("Debug log: {}", debug_log);
-
-        // the download stream is a stream of download progress events
-        // we can send these events to the client to update the progress
         while let Some(event) = download_stream.next().await {
             let event = event.map_err(|e| IrohError::DownloadError(e.to_string()))?;
 
@@ -190,42 +123,7 @@ impl IrohInstance {
             }
 
             match event {
-                DownloadProgress::FoundHashSeq { hash, .. } => {
-                    let hashseq = self
-                        .node
-                        .0
-                        .blobs()
-                        .read_to_bytes(hash)
-                        .await
-                        .map_err(|e| IrohError::DownloadError(e.to_string()))?;
-                    let hashseq = HashSeq::try_from(hashseq)
-                        .map_err(|e| IrohError::InvalidMetadata(e.to_string()))?;
-
-                    let metadata_hash = hashseq
-                        .iter()
-                        .next()
-                        .ok_or(IrohError::InvalidMetadata("hashseq is empty".to_string()))?;
-                    let metadata_bytes = self
-                        .node
-                        .0
-                        .blobs()
-                        .read_to_bytes(metadata_hash)
-                        .await
-                        .map_err(|e| IrohError::DownloadError(e.to_string()))?;
-
-                    let metadata: CollectionMetadata = postcard::from_bytes(&metadata_bytes)
-                        .map_err(|e| IrohError::InvalidMetadata(e.to_string()))?;
-
-                    // The hash sequence should have one more element than the metadata
-                    // because the first element is the metadata itself
-                    if metadata.names.len() + 1 != hashseq.len() {
-                        return Err(IrohError::InvalidMetadata(
-                            "metadata does not match hashseq".to_string(),
-                        ));
-                    }
-                    curr_hashseq = Some(hashseq);
-                    curr_metadata = Some(metadata);
-                }
+                DownloadProgress::FoundHashSeq { .. } => {}
 
                 DownloadProgress::AllDone(_) => {
                     let collection = self
@@ -244,13 +142,11 @@ impl IrohInstance {
                             .read_to_bytes(*hash)
                             .await
                             .map_err(|e| IrohError::DownloadError(e.to_string()))?;
-                        files.push({
-                            FileTransfer {
-                                name: name.clone(),
-                                transferred: content.len() as u64,
-                                total: content.len() as u64,
-                            }
-                        })
+                        files.push(FileTransfer {
+                            name: name.clone(),
+                            transferred: content.len() as u64,
+                            total: content.len() as u64,
+                        });
                     }
                     handle_chunk
                         .0
@@ -261,7 +157,7 @@ impl IrohInstance {
                         println!("[DEBUG FILE]: {:?}", temp_dir.join("drop_debug.log"));
                     }
 
-                    return Ok(collection.into());
+                    return Ok(collection);
                 }
 
                 DownloadProgress::Done { id } => {
@@ -276,30 +172,20 @@ impl IrohInstance {
                         .map_err(|_| IrohError::SendError)?;
                 }
 
-                DownloadProgress::Found { id, hash, size, .. } => {
-                    if let (Some(hashseq), Some(metadata)) = (&curr_hashseq, &curr_metadata) {
-                        if let Some(idx) = hashseq.iter().position(|h| h == hash) {
-                            if idx >= 1 && idx <= metadata.names.len() {
-                                if let Some(name) = metadata.names.get(idx - 1) {
-                                    files.push(FileTransfer {
-                                        name: name.clone(),
-                                        transferred: 0,
-                                        total: size,
-                                    });
-                                    handle_chunk
-                                        .0
-                                        .send(files.clone())
-                                        .map_err(|_| IrohError::SendError)?;
-                                    map.insert(id, name.clone());
-                                }
-                            }
-                        } else {
-                            return Err(IrohError::Unreachable(
-                                file!().to_string(),
-                                line!().to_string(),
-                            ));
-                        }
-                    }
+                DownloadProgress::Found { id, size, .. } => {
+                    // Track the download with a temporary name
+                    let name = format!("file_{}", id);
+                    files.push(FileTransfer {
+                        name: name.clone(),
+                        transferred: 0,
+                        total: size,
+                    });
+                    handle_chunk
+                        .0
+                        .send(files.clone())
+                        .map_err(|_| IrohError::SendError)?;
+                    map.insert(id, name);
+
                     if debug_log {
                         let mut log_file = std::fs::OpenOptions::new()
                             .create(true)
@@ -322,24 +208,15 @@ impl IrohInstance {
                         .map_err(|_| IrohError::SendError)?;
                 }
 
-                DownloadProgress::FoundLocal { hash, size, .. } => {
-                    if let (Some(hashseq), Some(metadata)) = (&curr_hashseq, &curr_metadata) {
-                        if let Some(idx) = hashseq.iter().position(|h| h == hash) {
-                            if idx >= 1 && idx <= metadata.names.len() {
-                                if let Some(name) = metadata.names.get(idx - 1) {
-                                    if let Some(file) =
-                                        files.iter_mut().find(|file| file.name == *name)
-                                    {
-                                        file.transferred = size.value();
-                                        file.total = size.value();
-                                        handle_chunk
-                                            .0
-                                            .send(files.clone())
-                                            .map_err(|_| IrohError::SendError)?;
-                                    }
-                                }
-                            }
-                        }
+                DownloadProgress::FoundLocal { size, .. } => {
+                    // Local file found, update if we're tracking it
+                    if let Some(file) = files.last_mut() {
+                        file.transferred = size.value();
+                        file.total = size.value();
+                        handle_chunk
+                            .0
+                            .send(files.clone())
+                            .map_err(|_| IrohError::SendError)?;
                     }
                 }
 
@@ -347,11 +224,12 @@ impl IrohInstance {
             }
         }
 
-        // If we reach this point, the download stream has ended without completing the download
         if debug_log {
             println!("[DEBUG FILE]: {:?}", temp_dir.join("drop_debug.log"));
         }
 
+        // This should not be reached if AllDone was processed
+        // Try to get the collection as a fallback
         let collection = self
             .node
             .0
@@ -360,11 +238,11 @@ impl IrohInstance {
             .await
             .map_err(|e| IrohError::DownloadError(e.to_string()))?;
 
-        Ok(collection.into())
+        Ok(collection)
     }
 }
 
-pub async fn import_blobs<'a>(
+pub async fn import_blobs(
     iroh: &IrohInstance,
     paths: Vec<PathBuf>,
 ) -> IrohResult<Vec<(PathBuf, AddOutcome)>> {
@@ -382,7 +260,10 @@ pub async fn import_blobs<'a>(
                 if let Ok(progress) = outcome {
                     Ok((path.clone(), progress))
                 } else {
-                    Err(IrohError::NodeError("Failed to import blob".to_string()))
+                    Err(IrohError::NodeError(format!(
+                        "Failed to import blob: {:?}",
+                        outcome
+                    )))
                 }
             }
             Err(e) => Err(IrohError::NodeError(e.to_string())),
@@ -390,4 +271,220 @@ pub async fn import_blobs<'a>(
     });
 
     try_join_all(outcomes).await
+}
+
+#[cfg(test)]
+mod test {
+    use std::{
+        fs,
+        path::PathBuf,
+        sync::{mpsc::channel, Arc},
+    };
+
+    use tokio;
+
+    use crate::{FileTransfer, FileTransferHandle, IrohInstance};
+
+    #[tokio::test]
+    async fn test_send_files() {
+        let instance = IrohInstance::new().await.unwrap();
+
+        // Create files directly in the current directory
+        let file1 = PathBuf::from("./test_file1.txt");
+        let file2 = PathBuf::from("./test_file2.txt");
+        std::fs::write(&file1, "content1").unwrap();
+        std::fs::write(&file2, "content2").unwrap();
+        let files = vec![
+            fs::canonicalize(&file1).unwrap(),
+            fs::canonicalize(&file2).unwrap(),
+        ];
+
+        // Call send_files and verify the result
+        let ticket = instance.send_files(files).await.unwrap();
+        assert!(!ticket.to_string().is_empty(), "Ticket should not be empty");
+
+        // Clean up
+        std::fs::remove_file(&file1).unwrap();
+        std::fs::remove_file(&file2).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_receive_files() {
+        let instance = IrohInstance::new().await.unwrap();
+
+        let file1 = PathBuf::from("test_file1.txt");
+        let file2 = PathBuf::from("test_file2.txt");
+        std::fs::write(&file1, "content1").unwrap();
+        std::fs::write(&file2, "content2").unwrap();
+        let files = vec![
+            fs::canonicalize(&file1).unwrap(),
+            fs::canonicalize(&file2).unwrap(),
+        ];
+        let ticket = instance.send_files(files).await.unwrap();
+        let ticket_str = ticket.to_string();
+
+        let (tx, _rx) = channel::<Vec<FileTransfer>>();
+        let handle = Arc::new(crate::FileTransferHandle(tx));
+
+        let collection = instance.receive_files(ticket_str, handle).await.unwrap();
+
+        // Verify the collection
+        let names: Vec<String> = collection.iter().map(|(name, _)| name.clone()).collect();
+        assert_eq!(names.len(), 2, "Collection should contain two files");
+        assert!(
+            names.contains(&"test_file1.txt".to_string()),
+            "Collection should contain test_file1.txt"
+        );
+        assert!(
+            names.contains(&"test_file2.txt".to_string()),
+            "Collection should contain test_file2.txt"
+        );
+
+        // Clean up
+        std::fs::remove_file(&file1).unwrap();
+        std::fs::remove_file(&file2).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_large_file_transfer() {
+        // Create a 1MB test file
+        let test_file = PathBuf::from("test_1mb_file.bin");
+        let file_size = 1024 * 1024; // 1MB
+        let test_data: Vec<u8> = (0..file_size).map(|i| (i % 256) as u8).collect();
+        fs::write(&test_file, &test_data).expect("Failed to create test file");
+
+        println!("Created test file with size: {} bytes", file_size);
+
+        // Create a single instance for both sending and receiving (like the other tests)
+        let instance = IrohInstance::new().await.unwrap();
+
+        // Send the file
+        let files = vec![fs::canonicalize(&test_file).unwrap()];
+        let ticket = instance.send_files(files).await.unwrap();
+        let ticket_str = ticket.to_string();
+
+        println!("Generated ticket: {}", ticket_str);
+
+        // Set up transfer monitoring
+        let (tx, rx) = channel::<Vec<FileTransfer>>();
+        let handle = Arc::new(FileTransferHandle(tx));
+
+        // Receive the file using the same instance
+        let collection = instance
+            .receive_files(ticket_str.clone(), handle)
+            .await
+            .unwrap();
+
+        // Verify the collection
+        for (name, hash) in collection.iter() {
+            println!("Received file: {} with hash: {}", name, hash);
+
+            // Read the received content
+            let content = instance
+                .get_node()
+                .0
+                .blobs()
+                .read_to_bytes(*hash)
+                .await
+                .expect("Failed to read blob");
+
+            println!("Received file size: {} bytes", content.len());
+
+            // Verify size
+            assert_eq!(
+                content.len(),
+                file_size,
+                "File size mismatch! Expected {} bytes, got {} bytes",
+                file_size,
+                content.len()
+            );
+
+            // Verify content
+            assert_eq!(content.to_vec(), test_data, "File content mismatch!");
+
+            println!("✅ File transfer successful! Size and content match.");
+        }
+
+        // Check transfer progress messages
+        while let Ok(progress) = rx.try_recv() {
+            for file in progress {
+                println!(
+                    "Transfer progress: {} - {}/{} bytes",
+                    file.name, file.transferred, file.total
+                );
+            }
+        }
+
+        // Clean up
+        fs::remove_file(&test_file).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_multiple_files_transfer() {
+        // Create multiple test files of different sizes
+        let file1 = PathBuf::from("test_file_100kb.bin");
+        let file2 = PathBuf::from("test_file_500kb.bin");
+        let file3 = PathBuf::from("test_file_1mb.bin");
+
+        let data1: Vec<u8> = (0..102400).map(|i| (i % 256) as u8).collect(); // 100KB
+        let data2: Vec<u8> = (0..512000).map(|i| (i % 256) as u8).collect(); // 500KB
+        let data3: Vec<u8> = (0..1048576).map(|i| (i % 256) as u8).collect(); // 1MB
+
+        fs::write(&file1, &data1).unwrap();
+        fs::write(&file2, &data2).unwrap();
+        fs::write(&file3, &data3).unwrap();
+
+        let instance = IrohInstance::new().await.unwrap();
+
+        // Send multiple files
+        let files = vec![
+            fs::canonicalize(&file1).unwrap(),
+            fs::canonicalize(&file2).unwrap(),
+            fs::canonicalize(&file3).unwrap(),
+        ];
+
+        let ticket = instance.send_files(files).await.unwrap();
+        let ticket_str = ticket.to_string();
+
+        let (tx, _rx) = channel::<Vec<FileTransfer>>();
+        let handle = Arc::new(FileTransferHandle(tx));
+
+        let collection = instance.receive_files(ticket_str, handle).await.unwrap();
+
+        // Verify all files were received
+        let names: Vec<String> = collection.iter().map(|(name, _)| name.clone()).collect();
+        assert_eq!(names.len(), 3, "Should receive 3 files");
+
+        // Verify each file
+        for (name, hash) in collection.iter() {
+            let content = instance
+                .get_node()
+                .0
+                .blobs()
+                .read_to_bytes(*hash)
+                .await
+                .unwrap();
+
+            let expected_size = if name.contains("100kb") {
+                102400
+            } else if name.contains("500kb") {
+                512000
+            } else {
+                1048576
+            };
+
+            assert_eq!(content.len(), expected_size, "File {} size mismatch", name);
+
+            println!(
+                "✅ File {} transferred successfully ({} bytes)",
+                name,
+                content.len()
+            );
+        }
+
+        // Clean up
+        fs::remove_file(&file1).unwrap();
+        fs::remove_file(&file2).unwrap();
+        fs::remove_file(&file3).unwrap();
+    }
 }
