@@ -8,8 +8,7 @@ use std::sync::{mpsc::Sender, Arc};
 // ARK-Core imports
 use dropx_receiver::{
     receive_files, ReceiveFilesBubble, ReceiveFilesConnectingEvent, ReceiveFilesReceivingEvent,
-    ReceiveFilesRequest as ReceiverRequest, ReceiveFilesSubscriber, ReceiverConfig,
-    ReceiverProfile,
+    ReceiveFilesRequest as ReceiverRequest, ReceiveFilesSubscriber, ReceiverProfile,
 };
 use dropx_sender::{
     send_files, SendFilesBubble, SendFilesConnectingEvent, SendFilesRequest, SendFilesSendingEvent,
@@ -241,7 +240,7 @@ impl IrohInstance {
             ticket,
             confirmation,
             profile,
-            config: Some(ReceiverConfig::default()),
+            config: None,
         };
 
         // Create shared collection for tracking received files

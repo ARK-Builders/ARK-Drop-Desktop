@@ -1,27 +1,18 @@
 <script>
 	import { goto } from '$app/navigation';
-	import Code from '$lib/components/Code.svelte';
+	import Button from '$lib/components/Button.svelte';
 	import ChevronLeft from '$lib/components/icons/ChevronLeft.svelte';
-	import { invoke } from '@tauri-apps/api/core';
 
 	export let data;
 
-	let isValidHash = invoke('is_valid_ticket', { ticket: data.hash });
+	let confirmationCode = '';
 
-	if (!isValidHash) {
-		goto('/transfers');
+	async function handleSubmit() {
+		if (confirmationCode.trim() === '') return;
+		const fullTicket = `${data.hash}:${confirmationCode.trim()}`;
+
+		goto('/transfers/transferring?ticket=' + encodeURIComponent(fullTicket));
 	}
-
-	let codes = [data.confirmationCode];
-
-	while (codes.length < 3) {
-		const randomCode = Math.floor(Math.random() * 100);
-		if (!codes.includes(randomCode)) {
-			codes.push(randomCode);
-		}
-	}
-
-	codes = codes.sort(() => Math.random() - 0.5);
 </script>
 
 <header class="my-2 flex flex-row justify-between px-4 py-2">
@@ -38,23 +29,28 @@
 
 <div class="mt-48 flex w-full flex-col items-center gap-1">
 	<span class="text-center text-lg font-medium text-gray-modern-900"
-		>Chose the confirmation Code</span
+		>Enter confirmation code</span
 	>
 	<span class="text-center text-sm text-gray-modern-500"
-		>Make sure code confirmation are matched</span
+		>Enter the confirmation code from the sender</span
 	>
-	<div class="mt-6 flex flex-row gap-6">
-		{#each codes as code}
-			<Code
-				{code}
-				on:click={async () => {
-					if (code === data.confirmationCode) {
-						goto('/transfers/transferring?ticket=' + data.hash);
-					} else {
-						goto('/transfers/failed');
-					}
-				}}
-			/>
-		{/each}
+	<div class="mt-6 flex w-full max-w-sm flex-col gap-4 px-4">
+		<input
+			bind:value={confirmationCode}
+			type="text"
+			placeholder="Confirmation code"
+			class="w-full rounded-lg border border-gray-200 p-3 text-center text-lg shadow-lg"
+			on:keypress={(e) => {
+				if (e.key === 'Enter') {
+					handleSubmit();
+				}
+			}}
+		/>
+		<Button
+			disabled={confirmationCode.trim() === ''}
+			on:click={handleSubmit}
+		>
+			Continue
+		</Button>
 	</div>
 </div>
