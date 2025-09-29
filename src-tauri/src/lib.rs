@@ -7,7 +7,9 @@ use dropx_sender::SendFilesBubble;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::ipc::InvokeError;
-use tauri::{generate_context, generate_handler, AppHandle, Emitter, Manager, tray::TrayIconBuilder};
+use tauri::{
+    generate_context, generate_handler, tray::TrayIconBuilder, AppHandle, Emitter, Manager,
+};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
