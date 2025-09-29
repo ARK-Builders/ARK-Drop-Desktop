@@ -110,6 +110,7 @@ dependencies = [
  "anyhow",
  "dirs 5.0.1",
  "drop_core",
+ "dropx-sender",
  "open",
  "serde",
  "serde_json",

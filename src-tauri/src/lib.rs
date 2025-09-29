@@ -2,7 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use anyhow::{anyhow, Result};
-use drop_core::{BlobTicket, Collection, FileTransfer, FileTransferHandle, IrohInstance};
+use drop_core::{BlobTicket, FileTransfer, FileTransferHandle, IrohInstance};
+use dropx_sender::SendFilesBubble;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::ipc::InvokeError;
@@ -13,6 +14,8 @@ use tokio::sync::Mutex;
 struct AppState {
     pub iroh: IrohInstance,
     inner: Mutex<mpsc::Sender<Event>>,
+    // Store active send bubble to keep it alive
+    active_send_bubble: Arc<Mutex<Option<SendFilesBubble>>>,
 }
 
 enum Event {
@@ -24,6 +27,7 @@ impl AppState {
         AppState {
             iroh,
             inner: Mutex::new(async_proc_input_tx),
+            active_send_bubble: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -110,11 +114,53 @@ async fn generate_ticket(
     state: tauri::State<'_, AppState>,
     paths: Vec<PathBuf>,
 ) -> Result<BlobTicket, InvokeError> {
-    state
+    let async_proc_input_tx = state.inner.lock().await.clone();
+
+    // Create channel for progress updates during sending
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<FileTransfer>>();
+
+    // Spawn task to handle sending progress updates
+    let _progress_handle = tokio::spawn(async move {
+        while let Ok(files) = rx.recv() {
+            let _ = async_proc_input_tx.send(Event::Files(files)).await;
+        }
+    });
+
+    // Get both ticket and bubble from send_files
+    let (ticket, bubble) = state
         .iroh
-        .send_files(paths)
+        .send_files(paths, Arc::new(FileTransferHandle(tx)))
         .await
-        .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))
+        .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
+
+    // Store the bubble to keep it alive
+    *state.active_send_bubble.lock().await = Some(bubble);
+
+    // Spawn a task to manage the sender lifecycle
+    let state_bubble = Arc::clone(&state.active_send_bubble);
+    tokio::spawn(async move {
+        // Wait for completion like ark-core CLI
+        loop {
+            let is_finished = {
+                if let Some(bubble) = state_bubble.lock().await.as_ref() {
+                    bubble.is_finished()
+                } else {
+                    true // No bubble, exit
+                }
+            };
+
+            if is_finished {
+                break;
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+
+        // Clear the bubble when done
+        *state_bubble.lock().await = None;
+    });
+
+    Ok(ticket)
 }
 
 #[tauri::command]
@@ -124,43 +170,32 @@ async fn receive_files(
 ) -> Result<PathBuf, InvokeError> {
     let async_proc_input_tx = state.inner.lock().await.clone();
 
-    let mut handles = Vec::new();
-
     let (tx, rx) = std::sync::mpsc::channel::<Vec<FileTransfer>>();
 
-    handles.push(tokio::spawn(async move {
-        loop {
-            let files = rx.recv();
-            if let Ok(files) = files {
-                let _ = async_proc_input_tx.send(Event::Files(files)).await;
-            } else {
-                break;
-            }
+    // Spawn task to handle receiving progress updates
+    let _handle = tokio::spawn(async move {
+        while let Ok(files) = rx.recv() {
+            let _ = async_proc_input_tx.send(Event::Files(files)).await;
         }
-    }));
+    });
 
-    let _files = state
-        .iroh
-        .receive_files(ticket, Arc::new(FileTransferHandle(tx)))
-        .await
-        .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
-
-    for handle in handles {
-        handle.await.unwrap();
-    }
-
-    let outpath = if let Some(path) = dirs::download_dir() {
+    // Determine output directory
+    let output_dir = if let Some(path) = dirs::download_dir() {
         path
     } else {
         // Android download path
         PathBuf::from("/storage/emulated/0/Download/")
     };
 
-    // Note: With ark-core, files are automatically written during the receive process
-    // The Collection currently just tracks metadata, not the actual file data
-    // TODO: Update this when we implement proper file output handling in the adapter
+    // Receive files with proper file writing
+    let _collection = state
+        .iroh
+        .receive_files(ticket, output_dir.clone(), Arc::new(FileTransferHandle(tx)))
+        .await
+        .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
 
-    Ok(outpath)
+    // Return the output directory where files were saved
+    Ok(output_dir)
 }
 
 #[tauri::command]
