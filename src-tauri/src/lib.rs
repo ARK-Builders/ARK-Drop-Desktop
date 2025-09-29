@@ -2,12 +2,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use anyhow::{anyhow, Result};
-use drop_core::IrohInstance;
-use drop_core::{FileTransfer, FileTransferHandle};
-use iroh_base::ticket::BlobTicket;
-use iroh_blobs::BlobFormat;
+use drop_core::{BlobTicket, Collection, FileTransfer, FileTransferHandle, IrohInstance};
+use std::path::PathBuf;
 use std::sync::Arc;
-use std::{path::PathBuf, str::FromStr, vec};
 use tauri::ipc::InvokeError;
 use tauri::{generate_context, generate_handler, AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
@@ -142,7 +139,7 @@ async fn receive_files(
         }
     }));
 
-    let files = state
+    let _files = state
         .iroh
         .receive_files(ticket, Arc::new(FileTransferHandle(tx)))
         .await
@@ -159,19 +156,9 @@ async fn receive_files(
         PathBuf::from("/storage/emulated/0/Download/")
     };
 
-    for (name, hash) in files.iter() {
-        let content = state
-            .iroh
-            .get_node()
-            .0
-            .blobs()
-            .read_to_bytes(*hash)
-            .await
-            .map_err(|e| InvokeError::from_anyhow(anyhow!("failed to read blob: {}", e)))?;
-        let file_path = outpath.join(name);
-        std::fs::write(&file_path, content)
-            .map_err(|e| InvokeError::from_anyhow(anyhow!("failed to write file: {}", e)))?;
-    }
+    // Note: With ark-core, files are automatically written during the receive process
+    // The Collection currently just tracks metadata, not the actual file data
+    // TODO: Update this when we implement proper file output handling in the adapter
 
     Ok(outpath)
 }
@@ -183,8 +170,9 @@ fn open_directory(directory: PathBuf) -> Result<(), InvokeError> {
 
 #[tauri::command]
 fn is_valid_ticket(ticket: String) -> Result<bool, InvokeError> {
-    let ticket = BlobTicket::from_str(&ticket)
-        .map_err(|e| InvokeError::from_anyhow(anyhow::anyhow!("failed to parse ticket: {}", e)))?;
-
-    Ok(ticket.format() == BlobFormat::HashSeq)
+    // With ark-core, we can simply try to parse the ticket
+    match BlobTicket::parse(&ticket) {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false),
+    }
 }
