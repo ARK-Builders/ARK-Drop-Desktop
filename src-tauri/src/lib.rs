@@ -7,7 +7,9 @@ use dropx_sender::SendFilesBubble;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::ipc::InvokeError;
-use tauri::{generate_context, generate_handler, AppHandle, Emitter, Manager};
+use tauri::{
+    generate_context, generate_handler, tray::TrayIconBuilder, AppHandle, Emitter, Manager,
+};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
@@ -54,6 +56,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let handle = app.handle().clone();
+
+            // Setup system tray icon
+            let _ = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("ARK Drop - File Transfer")
+                .build(app)?;
 
             tauri::async_runtime::spawn(async move {
                 async_process_model(async_proc_input_rx, async_proc_output_tx).await

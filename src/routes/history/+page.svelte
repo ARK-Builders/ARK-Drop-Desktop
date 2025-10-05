@@ -43,7 +43,10 @@
 </script>
 
 <header class="flex flex-row items-center bg-blue-dark-500 p-4">
-	<h1 class="flex-1 text-lg font-semibold text-white">History</h1>
+	<div class="flex items-center gap-3 flex-1">
+		<img class="w-8 h-8" src="/logo.png" alt="ARK Drop Logo" />
+		<h1 class="text-lg font-semibold text-white">History</h1>
+	</div>
 	<button
 		class="flex h-9 flex-row items-center gap-2 rounded-lg bg-blue-dark-400 px-3 text-sm font-semibold text-white"
 		><FilterLines class="h-5 w-5 stroke-white" /> Recent</button

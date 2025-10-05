@@ -9,7 +9,10 @@
 </script>
 
 <div class="flex w-full flex-col bg-blue-dark-500 p-4">
-	<span class="mb-4 text-lg font-semibold text-white">Settings</span>
+	<div class="flex items-center gap-3 mb-4">
+		<img class="w-8 h-8" src="/logo.png" alt="ARK Drop Logo" />
+		<span class="text-lg font-semibold text-white">Settings</span>
+	</div>
 	<div class="bg-blue-dark-400 my-2 flex flex-row items-center gap-4 rounded-lg p-[10px]">
 		<div class="h-10 w-10 overflow-hidden rounded-full border-2 border-white">
 			<img src="/images/avatar2.png" alt="" />
