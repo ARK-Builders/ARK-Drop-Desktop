@@ -9,8 +9,6 @@
 	import { Html5Qrcode } from 'html5-qrcode';
 	import { onMount } from 'svelte';
 
-	let videoSource: HTMLVideoElement | null = null;
-	let loading = false;
 	let devHash = '';
 	let openModal = false;
 
