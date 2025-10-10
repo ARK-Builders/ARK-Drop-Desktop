@@ -43,8 +43,8 @@
 </script>
 
 <header class="flex flex-row items-center bg-blue-dark-500 p-4">
-	<div class="flex items-center gap-3 flex-1">
-		<img class="w-8 h-8" src="/logo.png" alt="ARK Drop Logo" />
+	<div class="flex flex-1 items-center gap-3">
+		<img class="h-8 w-8" src="/logo.png" alt="ARK Drop Logo" />
 		<h1 class="text-lg font-semibold text-white">History</h1>
 	</div>
 	<button

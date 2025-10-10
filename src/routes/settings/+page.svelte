@@ -9,11 +9,11 @@
 </script>
 
 <div class="flex w-full flex-col bg-blue-dark-500 p-4">
-	<div class="flex items-center gap-3 mb-4">
-		<img class="w-8 h-8" src="/logo.png" alt="ARK Drop Logo" />
+	<div class="mb-4 flex items-center gap-3">
+		<img class="h-8 w-8" src="/logo.png" alt="ARK Drop Logo" />
 		<span class="text-lg font-semibold text-white">Settings</span>
 	</div>
-	<div class="bg-blue-dark-400 my-2 flex flex-row items-center gap-4 rounded-lg p-[10px]">
+	<div class="my-2 flex flex-row items-center gap-4 rounded-lg bg-blue-dark-400 p-[10px]">
 		<div class="h-10 w-10 overflow-hidden rounded-full border-2 border-white">
 			<img src="/images/avatar2.png" alt="" />
 		</div>
@@ -30,17 +30,17 @@
 </div>
 
 <ul
-	class="stroke-nav-item-icon-fg text-text-secondary-700 my-3 flex flex-col gap-3 p-4 font-semibold"
+	class="my-3 flex flex-col gap-3 stroke-nav-item-icon-fg p-4 font-semibold text-text-secondary-700"
 >
 	<li class="flex flex-row gap-3 px-3 py-2"><File06 class=" h-6 w-6" />Tems of service</li>
 	<li class="flex flex-row gap-3 px-3 py-2">
-		<ShieldTick class="stroke-nav-item-icon-fg h-6 w-6" />Privacy Policy
+		<ShieldTick class="h-6 w-6 stroke-nav-item-icon-fg" />Privacy Policy
 	</li>
 	<li class="flex flex-row gap-3 px-3 py-2">
-		<Star01 class="stroke-nav-item-icon-fg h-6 w-6" />Rate Us
+		<Star01 class="h-6 w-6 stroke-nav-item-icon-fg" />Rate Us
 	</li>
 	<li class="flex flex-row gap-3 px-3 py-2">
-		<MessageQuestionSquare class="stroke-nav-item-icon-fg h-6 w-6" />Feedback
+		<MessageQuestionSquare class="h-6 w-6 stroke-nav-item-icon-fg" />Feedback
 	</li>
 </ul>
 

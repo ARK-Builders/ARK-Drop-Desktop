@@ -10,7 +10,7 @@ on:
   pull_request:
     branches:
       - main
-      
+
 jobs:
   build-library:
     name: Build Core Library and Kotlin Bindings

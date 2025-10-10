@@ -28,9 +28,7 @@
 </header>
 
 <div class="mt-48 flex w-full flex-col items-center gap-1">
-	<span class="text-center text-lg font-medium text-gray-modern-900"
-		>Enter confirmation code</span
-	>
+	<span class="text-center text-lg font-medium text-gray-modern-900">Enter confirmation code</span>
 	<span class="text-center text-sm text-gray-modern-500"
 		>Enter the confirmation code from the sender</span
 	>
@@ -46,11 +44,6 @@
 				}
 			}}
 		/>
-		<Button
-			disabled={confirmationCode.trim() === ''}
-			on:click={handleSubmit}
-		>
-			Continue
-		</Button>
+		<Button disabled={confirmationCode.trim() === ''} on:click={handleSubmit}>Continue</Button>
 	</div>
 </div>
