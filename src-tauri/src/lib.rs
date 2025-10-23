@@ -2,20 +2,22 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use anyhow::{anyhow, Result};
-use drop_core::IrohInstance;
-use drop_core::{FileTransfer, FileTransferHandle};
-use iroh_base::ticket::BlobTicket;
-use iroh_blobs::BlobFormat;
+use drop_core::{BlobTicket, FileTransfer, FileTransferHandle, IrohInstance};
+use dropx_sender::SendFilesBubble;
+use std::path::PathBuf;
 use std::sync::Arc;
-use std::{path::PathBuf, str::FromStr, vec};
 use tauri::ipc::InvokeError;
-use tauri::{generate_context, generate_handler, AppHandle, Emitter, Manager};
+use tauri::{
+    generate_context, generate_handler, tray::TrayIconBuilder, AppHandle, Emitter, Manager,
+};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
 struct AppState {
     pub iroh: IrohInstance,
     inner: Mutex<mpsc::Sender<Event>>,
+    // Store active send bubble to keep it alive
+    active_send_bubble: Arc<Mutex<Option<SendFilesBubble>>>,
 }
 
 enum Event {
@@ -27,6 +29,7 @@ impl AppState {
         AppState {
             iroh,
             inner: Mutex::new(async_proc_input_tx),
+            active_send_bubble: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -53,6 +56,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let handle = app.handle().clone();
+
+            // Setup system tray icon
+            let _ = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("ARK Drop - File Transfer")
+                .build(app)?;
 
             tauri::async_runtime::spawn(async move {
                 async_process_model(async_proc_input_rx, async_proc_output_tx).await
@@ -113,11 +122,53 @@ async fn generate_ticket(
     state: tauri::State<'_, AppState>,
     paths: Vec<PathBuf>,
 ) -> Result<BlobTicket, InvokeError> {
-    state
+    let async_proc_input_tx = state.inner.lock().await.clone();
+
+    // Create channel for progress updates during sending
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<FileTransfer>>();
+
+    // Spawn task to handle sending progress updates
+    let _progress_handle = tokio::spawn(async move {
+        while let Ok(files) = rx.recv() {
+            let _ = async_proc_input_tx.send(Event::Files(files)).await;
+        }
+    });
+
+    // Get both ticket and bubble from send_files
+    let (ticket, bubble) = state
         .iroh
-        .send_files(paths)
+        .send_files(paths, Arc::new(FileTransferHandle(tx)))
         .await
-        .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))
+        .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
+
+    // Store the bubble to keep it alive
+    *state.active_send_bubble.lock().await = Some(bubble);
+
+    // Spawn a task to manage the sender lifecycle
+    let state_bubble = Arc::clone(&state.active_send_bubble);
+    tokio::spawn(async move {
+        // Wait for completion like ark-core CLI
+        loop {
+            let is_finished = {
+                if let Some(bubble) = state_bubble.lock().await.as_ref() {
+                    bubble.is_finished()
+                } else {
+                    true // No bubble, exit
+                }
+            };
+
+            if is_finished {
+                break;
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+
+        // Clear the bubble when done
+        *state_bubble.lock().await = None;
+    });
+
+    Ok(ticket)
 }
 
 #[tauri::command]
@@ -127,53 +178,32 @@ async fn receive_files(
 ) -> Result<PathBuf, InvokeError> {
     let async_proc_input_tx = state.inner.lock().await.clone();
 
-    let mut handles = Vec::new();
-
     let (tx, rx) = std::sync::mpsc::channel::<Vec<FileTransfer>>();
 
-    handles.push(tokio::spawn(async move {
-        loop {
-            let files = rx.recv();
-            if let Ok(files) = files {
-                let _ = async_proc_input_tx.send(Event::Files(files)).await;
-            } else {
-                break;
-            }
+    // Spawn task to handle receiving progress updates
+    let _handle = tokio::spawn(async move {
+        while let Ok(files) = rx.recv() {
+            let _ = async_proc_input_tx.send(Event::Files(files)).await;
         }
-    }));
+    });
 
-    let files = state
-        .iroh
-        .receive_files(ticket, Arc::new(FileTransferHandle(tx)))
-        .await
-        .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
-
-    for handle in handles {
-        handle.await.unwrap();
-    }
-
-    let outpath = if let Some(path) = dirs::download_dir() {
+    // Determine output directory
+    let output_dir = if let Some(path) = dirs::download_dir() {
         path
     } else {
         // Android download path
         PathBuf::from("/storage/emulated/0/Download/")
     };
 
-    for (name, hash) in files.iter() {
-        let content = state
-            .iroh
-            .get_node()
-            .0
-            .blobs()
-            .read_to_bytes(*hash)
-            .await
-            .map_err(|e| InvokeError::from_anyhow(anyhow!("failed to read blob: {}", e)))?;
-        let file_path = outpath.join(name);
-        std::fs::write(&file_path, content)
-            .map_err(|e| InvokeError::from_anyhow(anyhow!("failed to write file: {}", e)))?;
-    }
+    // Receive files with proper file writing
+    let _collection = state
+        .iroh
+        .receive_files(ticket, output_dir.clone(), Arc::new(FileTransferHandle(tx)))
+        .await
+        .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
 
-    Ok(outpath)
+    // Return the output directory where files were saved
+    Ok(output_dir)
 }
 
 #[tauri::command]
@@ -183,8 +213,9 @@ fn open_directory(directory: PathBuf) -> Result<(), InvokeError> {
 
 #[tauri::command]
 fn is_valid_ticket(ticket: String) -> Result<bool, InvokeError> {
-    let ticket = BlobTicket::from_str(&ticket)
-        .map_err(|e| InvokeError::from_anyhow(anyhow::anyhow!("failed to parse ticket: {}", e)))?;
-
-    Ok(ticket.format() == BlobFormat::HashSeq)
+    // With ark-core, we can simply try to parse the ticket
+    match BlobTicket::parse(&ticket) {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false),
+    }
 }

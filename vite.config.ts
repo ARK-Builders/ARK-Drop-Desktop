@@ -7,15 +7,15 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	clearScreen: false,
 	server: {
-	  host: host || false,
-	  port: 1420,
-	  strictPort: true,
-	  hmr: host
-		? {
-			protocol: 'ws',
-			host: host,
-			port: 1430,
-		  }
-		: undefined,
-	},
+		host: host || false,
+		port: 1420,
+		strictPort: true,
+		hmr: host
+			? {
+					protocol: 'ws',
+					host: host,
+					port: 1430
+				}
+			: undefined
+	}
 });

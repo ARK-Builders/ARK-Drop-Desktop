@@ -8,17 +8,19 @@
 	import { onMount } from 'svelte';
 	import HashCode from '$lib/components/HashCode.svelte';
 	import { invoke } from '@tauri-apps/api/core';
-	import { getConfirmationCode } from '$lib/util.js';
+	import { constructQr } from '$lib/util.js';
 
 	export let data;
 
 	let confirmationCode: number | undefined;
 	let hashCode: string | undefined;
+	let qrCodeData: string | undefined;
 
 	onMount(async () => {
-		hashCode = (await invoke('generate_ticket', { paths: data.files })) as string;
-
-		confirmationCode = getConfirmationCode(hashCode);
+		const ticket = ((await invoke('generate_ticket', { paths: data.files })) as string).split(':');
+		hashCode = ticket[0];
+		confirmationCode = Number(ticket[1]);
+		qrCodeData = constructQr(hashCode, confirmationCode);
 	});
 
 	let connected = false;
@@ -54,7 +56,7 @@
 		<ConfirmationCode code={confirmationCode} />
 	</div>
 	<div class="mb-6">
-		<QrCode {hashCode} />
+		<QrCode hashCode={qrCodeData} />
 	</div>
 	<span class="mb-4 font-medium text-gray-modern-900"
 		>{connected ? 'Connected' : 'Waiting to connect...'}</span

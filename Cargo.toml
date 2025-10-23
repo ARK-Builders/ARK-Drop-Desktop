@@ -3,10 +3,13 @@ resolver = "2"
 members = ["core", "src-tauri"]
 
 [workspace.dependencies]
-iroh = "0.22.0"
-iroh-blobs = "0.22.0"
-iroh-base = "0.22.0"
-iroh-net = "0.22.0"
+# ARK-Builders/ark-core
+dropx-sender = { git = "https://github.com/ARK-Builders/ark-core", rev = "69ca7d8f76cab1514502cb6c8a09de77c01d3234" }
+dropx-receiver = { git = "https://github.com/ARK-Builders/ark-core", rev = "69ca7d8f76cab1514502cb6c8a09de77c01d3234" }
+dropx-common = { git = "https://github.com/ARK-Builders/ark-core", rev = "69ca7d8f76cab1514502cb6c8a09de77c01d3234" }
+drop-entities = { git = "https://github.com/ARK-Builders/ark-core", rev = "69ca7d8f76cab1514502cb6c8a09de77c01d3234" }
+
+# Keep existing dependencies that are still needed
 anyhow = "1.0.86"
 thiserror = "1.0.61"
 futures-buffered = "0.2.6"

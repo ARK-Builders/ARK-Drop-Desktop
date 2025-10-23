@@ -23,7 +23,7 @@
 				previousFile = file;
 			}
 			requestAnimationFrame(updateTransfer);
-		}
+		};
 		requestAnimationFrame(updateTransfer);
 	});
 
@@ -34,11 +34,10 @@
 	const dispatch = createEventDispatcher();
 
 	let openModal = false;
-
 </script>
 
 {#if file.transferred < file.total}
-<div class="flex w-full flex-col gap-3 rounded-2xl border-1 p-3">
+	<div class="flex w-full flex-col gap-3 rounded-2xl border-1 p-3">
 		<div class="flex flex-row items-center gap-3">
 			<div class="h-11 w-11 rounded-full border-1 p-[10px]">
 				<FileType />

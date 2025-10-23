@@ -57,11 +57,9 @@ export function getDateInterval(date: Date) {
 	}
 }
 
-export function getConfirmationCode(hash: string) {
-	return (
-		hash
-			.split('')
-			.map((char) => char.charCodeAt(0))
-			.reduce((acc, curr) => acc + curr, 0) % 100
-	);
+/**
+ * Construct a QR code
+ */
+export function constructQr(ticket: string, confirmation: number): string {
+	return `drop://receive?ticket=${encodeURIComponent(ticket)}&confirmation=${confirmation}`;
 }

@@ -34,7 +34,7 @@
 
 <div class="py-6">
 	<div class="flex flex-col items-center gap-6 px-4 py-5">
-		<img class="w-full max-w-96" src="/images/home.png" alt="Home" />
+		<img class="h-32 w-32" src="/logo.png" alt="ARK Drop Logo" />
 		<div class="flex flex-col items-center gap-1 text-center">
 			<h3 class="text-lg font-medium text-gray-modern-900">Seamless to transfer your files</h3>
 			<h4 class="text-sm text-gray-modern-500">
