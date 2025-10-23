@@ -15,7 +15,7 @@
 			showTooltip = false;
 		}, 1000);
 	}}
-	class="flex flex-row items-center gap-1 rounded-lg border-1 border-gray-modern-200 px-3 py-2"
+	class="flex flex-row items-center gap-1 rounded-lg border border-gray-modern-200 px-3 py-2"
 >
 	<Link03 class="h-4 w-4 stroke-gray-modern-600" />
 	<span class="text-xs text-gray-modern-600">Hash Code</span>

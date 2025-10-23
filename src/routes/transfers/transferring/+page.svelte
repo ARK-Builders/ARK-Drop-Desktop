@@ -46,9 +46,9 @@
 
 <div class="mt-12 flex flex-col items-center justify-center">
 	{#if done === false}
-		<div class="flex translate-x-[-0.5rem]">
+		<div class="flex -translate-x-2">
 			{#each avatars as avatar}
-				<div class="mr-[-1rem] h-16 w-16 overflow-hidden rounded-full border-4 border-white">
+				<div class="-mr-4 h-16 w-16 overflow-hidden rounded-full border-4 border-white">
 					<img src={`/images/${avatar}.png`} alt="" />
 				</div>
 			{/each}
