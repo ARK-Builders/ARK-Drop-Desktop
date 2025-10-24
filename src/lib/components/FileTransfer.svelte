@@ -37,9 +37,9 @@
 </script>
 
 {#if file.transferred < file.total}
-	<div class="flex w-full flex-col gap-3 rounded-2xl border-1 p-3">
+	<div class="flex w-full flex-col gap-3 rounded-2xl border p-3">
 		<div class="flex flex-row items-center gap-3">
-			<div class="h-11 w-11 rounded-full border-1 p-[10px]">
+			<div class="h-11 w-11 rounded-full border p-[10px]">
 				<FileType />
 			</div>
 			<div class="flex flex-1 flex-col justify-between py-1">
@@ -74,7 +74,7 @@
 			<div class="relative h-[6px] w-full rounded-full bg-gray-modern-300">
 				<div
 					style={`--percent-complete: ${100 - percentComplete(file.transferred, file.total)}%`}
-					class={`absolute left-0 right-[var(--percent-complete)] h-full rounded-full bg-blue-dark-500`}
+					class={`absolute left-0 right-(--percent-complete) h-full rounded-full bg-blue-dark-500`}
 				></div>
 			</div>
 		{/if}
@@ -102,7 +102,7 @@
 				>
 			</div>
 			<div class="flex flex-row gap-2">
-				<div class="border- h-11 w-11 rounded-full border-1 p-[10px]">
+				<div class="border- h-11 w-11 rounded-full border p-[10px]">
 					<FileType />
 				</div>
 				<div class="flex flex-1 flex-col justify-between py-1">

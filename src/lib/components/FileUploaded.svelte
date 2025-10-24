@@ -7,9 +7,9 @@
 	export let fileUploaded: FileUploaded;
 </script>
 
-<div class="flex w-full flex-col gap-3 rounded-2xl border-1 p-3">
+<div class="flex w-full flex-col gap-3 rounded-2xl border p-3">
 	<div class="flex flex-row items-center gap-3">
-		<div class="h-11 w-11 rounded-full border-1 p-[10px]">
+		<div class="h-11 w-11 rounded-full border p-[10px]">
 			<FileType />
 		</div>
 		<div class="flex flex-1 flex-col justify-between py-1">

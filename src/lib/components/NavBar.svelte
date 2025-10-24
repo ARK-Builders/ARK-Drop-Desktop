@@ -7,7 +7,7 @@
 	export let active: 'transfers' | 'history' | 'settings' = 'transfers';
 </script>
 
-<nav class="absolute bottom-0 left-0 right-0 flex flex-row border-t-1 border-gray-modern-200">
+<nav class="absolute bottom-0 left-0 right-0 flex flex-row border-t border-gray-modern-200">
 	<button
 		on:click={() => {
 			goto('/transfers');

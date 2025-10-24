@@ -22,7 +22,7 @@
 			on:click={() => {
 				goto('/settings/edit-profile');
 			}}
-			class="p rounded-lg border-1 border-button-secondary-border bg-white px-3 py-2"
+			class="p rounded-lg border border-button-secondary-border bg-white px-3 py-2"
 		>
 			<Edit05 class="h-5 w-5 stroke-button-secondary-fg" /></button
 		>

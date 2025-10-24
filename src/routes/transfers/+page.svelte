@@ -23,7 +23,7 @@
 </script>
 
 <header
-	class="flex flex-row items-center justify-between border-b-1 border-gray-modern-200 px-4 py-5"
+	class="flex flex-row items-center justify-between border-b border-gray-modern-200 px-4 py-5"
 >
 	<div class="text-gray-modern-900">
 		<h3 class="text-sm">Hi Alice,</h3>
@@ -42,7 +42,7 @@
 			</h4>
 		</div>
 	</div>
-	<div class="flex flex-row justify-center gap-[1.125rem] p-4">
+	<div class="flex flex-row justify-center gap-4.5 p-4">
 		<Button
 			on:click={async () => {
 				const files = await getSelectedFiles();
