@@ -2,10 +2,41 @@
 	import NavBar from '$lib/components/NavBar.svelte';
 	import Edit05 from '$lib/components/icons/Edit05.svelte';
 	import File06 from '$lib/components/icons/File06.svelte';
+	import FolderDownload from '$lib/components/icons/FolderDownload.svelte';
 	import ShieldTick from '$lib/components/icons/ShieldTick.svelte';
 	import MessageQuestionSquare from '$lib/components/icons/MessageQuestionSquare.svelte';
 	import Star01 from '$lib/components/icons/Star01.svelte';
 	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
+	import { invoke } from '@tauri-apps/api/core';
+	import { open } from '@tauri-apps/plugin-dialog';
+
+	let currentDirectory = '';
+
+	onMount(async () => {
+		try {
+			currentDirectory = await invoke('get_download_directory');
+		} catch (error) {
+			console.error('Failed to get download directory:', error);
+		}
+	});
+
+	async function selectDownloadDirectory() {
+		try {
+			const selected = await open({
+				directory: true,
+				multiple: false,
+				title: 'Select Download Directory'
+			});
+
+			if (selected && typeof selected === 'string') {
+				await invoke('set_download_directory', { path: selected });
+				currentDirectory = selected;
+			}
+		} catch (error) {
+			console.error('Failed to set download directory:', error);
+		}
+	}
 </script>
 
 <div class="flex w-full flex-col bg-blue-dark-500 p-4">
@@ -32,7 +63,21 @@
 <ul
 	class="my-3 flex flex-col gap-3 stroke-nav-item-icon-fg p-4 font-semibold text-text-secondary-700"
 >
-	<li class="flex flex-row gap-3 px-3 py-2"><File06 class=" h-6 w-6" />Tems of service</li>
+	<li>
+		<button
+			on:click={selectDownloadDirectory}
+			class="flex w-full flex-row items-center gap-3 rounded-lg px-3 py-2 hover:bg-gray-modern-100"
+		>
+			<FolderDownload class="h-6 w-6 stroke-nav-item-icon-fg" />
+			<div class="flex flex-1 flex-col items-start">
+				<span>Download Directory</span>
+				{#if currentDirectory}
+					<span class="text-xs font-normal text-gray-modern-500">{currentDirectory}</span>
+				{/if}
+			</div>
+		</button>
+	</li>
+	<li class="flex flex-row gap-3 px-3 py-2"><File06 class=" h-6 w-6" />Terms of service</li>
 	<li class="flex flex-row gap-3 px-3 py-2">
 		<ShieldTick class="h-6 w-6 stroke-nav-item-icon-fg" />Privacy Policy
 	</li>
