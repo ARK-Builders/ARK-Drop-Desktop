@@ -10,12 +10,22 @@
 	import { onMount } from 'svelte';
 	import { invoke } from '@tauri-apps/api/core';
 	import { open } from '@tauri-apps/plugin-dialog';
+	import { Store } from '@tauri-apps/plugin-store';
 
 	let currentDirectory = '';
+	let store: Store;
 
 	onMount(async () => {
 		try {
-			currentDirectory = await invoke('get_download_directory');
+			store = await Store.load('settings.json');
+
+			const savedDirectory = await store.get<string>('download_directory');
+			if (savedDirectory) {
+				await invoke('set_download_directory', { path: savedDirectory });
+				currentDirectory = savedDirectory;
+			} else {
+				currentDirectory = await invoke('get_download_directory');
+			}
 		} catch (error) {
 			console.error('Failed to get download directory:', error);
 		}
@@ -32,6 +42,9 @@
 			if (selected && typeof selected === 'string') {
 				await invoke('set_download_directory', { path: selected });
 				currentDirectory = selected;
+
+				await store.set('download_directory', selected);
+				await store.save();
 			}
 		} catch (error) {
 			console.error('Failed to set download directory:', error);
