@@ -1,11 +1,33 @@
 <script lang="ts">
 	import { open } from '@tauri-apps/plugin-dialog';
+	import { invoke } from '@tauri-apps/api/core';
+	import { Store } from '@tauri-apps/plugin-store';
+	import { onMount } from 'svelte';
 
 	import NavBar from '$lib/components/NavBar.svelte';
 	import ArrowCircleBrokenDown from '$lib/components/icons/ArrowCircleBrokenDown.svelte';
 	import ArrowCircleBrokenUp from '$lib/components/icons/ArrowCircleBrokenUp.svelte';
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/Button.svelte';
+
+	let displayName = '';
+
+	onMount(async () => {
+		try {
+			const store = await Store.load('settings.json');
+			const savedName = await store.get<string>('display_name');
+
+			if (savedName) {
+				await invoke('set_display_name', { name: savedName });
+				displayName = savedName;
+			} else {
+				displayName = await invoke('get_display_name');
+			}
+		} catch (error) {
+			console.error('Failed to load display name:', error);
+			displayName = 'there';
+		}
+	});
 
 	const getSelectedFiles = async () => {
 		const selected = await open({
@@ -26,7 +48,7 @@
 	class="flex flex-row items-center justify-between border-b border-gray-modern-200 px-4 py-5"
 >
 	<div class="text-gray-modern-900">
-		<h3 class="text-sm">Hi Alice,</h3>
+		<h3 class="text-sm">Hi {displayName || 'there'},</h3>
 		<h2 class="text-lg font-semibold">Welcome Back</h2>
 	</div>
 	<img class="h-11 w-11 rounded-full" src="/images/avatar.png" alt="Avatar" />
