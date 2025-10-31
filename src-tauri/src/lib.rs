@@ -23,6 +23,8 @@ struct AppState {
     active_send_bubble: Arc<Mutex<Option<SendFilesBubble>>>,
     /// Custom download directory set by user
     custom_download_dir: Mutex<Option<PathBuf>>,
+    /// User display name for file transfer identification
+    user_display_name: Mutex<Option<String>>,
 }
 
 enum Event {
@@ -36,6 +38,7 @@ impl AppState {
             inner: Mutex::new(async_proc_input_tx),
             active_send_bubble: Arc::new(Mutex::new(None)),
             custom_download_dir: Mutex::new(None),
+            user_display_name: Mutex::new(None),
         }
     }
 }
@@ -93,6 +96,8 @@ pub fn run() {
             receive_files,
             set_download_directory,
             get_download_directory,
+            set_display_name,
+            get_display_name,
             open_directory,
             is_valid_ticket,
             get_env
@@ -231,10 +236,22 @@ async fn receive_files(
             .unwrap_or_else(|| PathBuf::from("/storage/emulated/0/Download/"))
     };
 
+    // Get display name with fallback chain: custom → system username → None
+    let display_name = {
+        let custom_name = state.user_display_name.lock().await;
+        custom_name.clone()
+            .or_else(|| Some(whoami::username()))
+    };
+
     // Receive files with proper file writing
     let _collection = state
         .iroh
-        .receive_files(ticket, output_dir.clone(), Arc::new(FileTransferHandle(tx)))
+        .receive_files(
+            ticket,
+            output_dir.clone(),
+            Arc::new(FileTransferHandle(tx)),
+            display_name
+        )
         .await
         .map_err(|e| InvokeError::from_anyhow(anyhow!(e)))?;
 
@@ -293,6 +310,51 @@ async fn get_download_directory(state: tauri::State<'_, AppState>) -> Result<Str
         .unwrap_or_else(|| PathBuf::from("/storage/emulated/0/Download/"));
 
     Ok(output_dir.to_string_lossy().to_string())
+}
+
+/// Sets a custom display name for the user.
+///
+/// # Arguments
+/// * `name` - The display name to set
+///
+/// # Errors
+/// Returns an error if the name is empty or exceeds 50 characters
+#[tauri::command]
+async fn set_display_name(
+    state: tauri::State<'_, AppState>,
+    name: String,
+) -> Result<(), InvokeError> {
+    let trimmed = name.trim();
+
+    if trimmed.is_empty() {
+        return Err(InvokeError::from_anyhow(anyhow!("Display name cannot be empty")));
+    }
+
+    if trimmed.len() > 50 {
+        return Err(InvokeError::from_anyhow(anyhow!("Display name cannot exceed 50 characters")));
+    }
+
+    let mut display_name = state.user_display_name.lock().await;
+    *display_name = Some(trimmed.to_string());
+
+    Ok(())
+}
+
+/// Gets the current display name.
+///
+/// Returns the custom name if set, otherwise returns the system username.
+///
+/// # Returns
+/// The display name as a string
+#[tauri::command]
+async fn get_display_name(state: tauri::State<'_, AppState>) -> Result<String, InvokeError> {
+    let custom_name = state.user_display_name.lock().await;
+
+    let name = custom_name
+        .clone()
+        .unwrap_or_else(|| whoami::username());
+
+    Ok(name)
 }
 
 /// Opens a directory in the system's file manager.

@@ -13,12 +13,14 @@
 	import { Store } from '@tauri-apps/plugin-store';
 
 	let currentDirectory = '';
+	let displayName = '';
 	let store: Store;
 
-	onMount(async () => {
+	async function loadSettings() {
 		try {
 			store = await Store.load('settings.json');
 
+			// Load download directory
 			const savedDirectory = await store.get<string>('download_directory');
 			if (savedDirectory) {
 				await invoke('set_download_directory', { path: savedDirectory });
@@ -26,10 +28,30 @@
 			} else {
 				currentDirectory = await invoke('get_download_directory');
 			}
+
+			// Load display name
+			const savedName = await store.get<string>('display_name');
+			if (savedName) {
+				await invoke('set_display_name', { name: savedName });
+				displayName = savedName;
+			} else {
+				displayName = await invoke('get_display_name');
+			}
 		} catch (error) {
-			console.error('Failed to get download directory:', error);
+			console.error('Failed to load settings:', error);
 		}
-	});
+	}
+
+	onMount(loadSettings);
+
+	// Reload settings when page becomes visible (e.g., returning from edit-profile)
+	$: if (typeof document !== 'undefined') {
+		document.addEventListener('visibilitychange', () => {
+			if (!document.hidden) {
+				loadSettings();
+			}
+		});
+	}
 
 	async function selectDownloadDirectory() {
 		try {
@@ -61,7 +83,7 @@
 		<div class="h-10 w-10 overflow-hidden rounded-full border-2 border-white">
 			<img src="/images/avatar2.png" alt="" />
 		</div>
-		<span class="flex-1 text-lg font-semibold text-white">Gilbert</span>
+		<span class="flex-1 text-lg font-semibold text-white">{displayName || 'Loading...'}</span>
 		<button
 			on:click={() => {
 				goto('/settings/edit-profile');

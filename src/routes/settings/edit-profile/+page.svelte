@@ -1,5 +1,8 @@
-<script>
+<script lang="ts">
 	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
+	import { invoke } from '@tauri-apps/api/core';
+	import { Store } from '@tauri-apps/plugin-store';
 	import Button from '$lib/components/Button.svelte';
 	import ChevronLeft from '$lib/components/icons/ChevronLeft.svelte';
 	import ChevronRight from '$lib/components/icons/ChevronRight.svelte';
@@ -10,6 +13,8 @@
 	export let selectedAvatar = 'avatar2';
 
 	let openAvatars = false;
+	let displayName = '';
+	let store: Store;
 
 	let avatars = [
 		'avatar',
@@ -23,6 +28,35 @@
 		'avatar9',
 		'avatar10'
 	];
+
+	onMount(async () => {
+		try {
+			store = await Store.load('settings.json');
+			const savedName = await store.get<string>('display_name');
+
+			if (savedName) {
+				displayName = savedName;
+			} else {
+				displayName = await invoke('get_display_name');
+			}
+		} catch (error) {
+			console.error('Failed to load display name:', error);
+		}
+	});
+
+	async function saveProfile() {
+		try {
+			const trimmed = displayName.trim();
+			if (trimmed) {
+				await invoke('set_display_name', { name: trimmed });
+				await store.set('display_name', trimmed);
+				await store.save();
+			}
+			goto('/settings');
+		} catch (error) {
+			console.error('Failed to save profile:', error);
+		}
+	}
 </script>
 
 <header class="my-2 flex flex-row justify-between px-4 py-2">
@@ -50,14 +84,14 @@
 			>Change Avatar <ChevronRight class="h-5 w-5 stroke-gray-modern-900" /></button
 		>
 	</div>
-	<input class="w-full rounded-lg border-2 border-gray-modern-200 p-1 px-2" type="text" />
-	<Button
-		size="sm"
-		on:click={() => {
-			goto('/settings');
-		}}
-		class="w-full">Save</Button
-	>
+	<input
+		bind:value={displayName}
+		class="w-full rounded-lg border-2 border-gray-modern-200 p-1 px-2"
+		type="text"
+		placeholder="Enter your name"
+		maxlength="50"
+	/>
+	<Button size="sm" on:click={saveProfile} class="w-full">Save</Button>
 </div>
 
 {#if openAvatars}

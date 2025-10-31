@@ -206,6 +206,7 @@ impl IrohInstance {
         ticket_str: String,
         output_dir: PathBuf,
         handle: Arc<FileTransferHandle>,
+        display_name: Option<String>,
     ) -> IrohResult<Collection> {
         // Parse ticket to extract confirmation
         let (ticket, confirmation) = TicketWrapper::parse(&ticket_str)?;
@@ -229,9 +230,9 @@ impl IrohInstance {
             IrohError::DownloadError(format!("Failed to create receiving directory: {}", e))
         })?;
 
-        // Create receiver profile
+        // Create receiver profile with provided name or default to "Anonymous"
         let profile = ReceiverProfile {
-            name: "Anonymous".to_string(),
+            name: display_name.unwrap_or_else(|| "Anonymous".to_string()),
             avatar_b64: None,
         };
 
