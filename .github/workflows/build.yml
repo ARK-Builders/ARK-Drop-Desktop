@@ -35,16 +35,15 @@ jobs:
 
       - name: Get App Version from Cargo.toml
         id: drop_version
-        uses: dante-signal31/rust-app-version@v1.2.0
-        with:
-          cargo_toml_folder: src-tauri/
+        run: |
+          APP_VERSION=$(grep -E '^version\s*=' src-tauri/Cargo.toml | sed -E 's/version\s*=\s*"([^"]+)"/\1/')
+          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT
 
       - name: Install Dependencies (Ubuntu only)
         if: matrix.settings.platform == 'ubuntu-22.04' # This must match the platform value defined above.
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
 
       - name: Setup Node
         uses: actions/setup-node@v4
