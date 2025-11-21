@@ -37,7 +37,7 @@ jobs:
         id: drop_version
         run: |
           APP_VERSION=$(grep -E '^version\s*=' src-tauri/Cargo.toml | sed -E 's/version\s*=\s*"([^"]+)"/\1/')
-          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT
+          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Install Dependencies (Ubuntu only)
         if: matrix.settings.platform == 'ubuntu-22.04' # This must match the platform value defined above.
