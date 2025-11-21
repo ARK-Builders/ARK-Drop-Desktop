@@ -82,7 +82,7 @@ jobs:
             export APP_VERSION = $(grep -E '^version\s*=' src-tauri/Cargo.toml | sed -E 's/version\s*=\s*"([^"]+)"/\1/')
         with:
           name: ark-drop.AppImage
-          path: ./target/release/bundle/appimage/ark-drop_${{ env.APP_VERSION }}_amd64.AppImage
+          path: ./target/release/bundle/appimage/ARK Drop_${{ env.APP_VERSION }}_amd64.AppImage
 
       - name: Upload macOS Build (ark-drop.app)
         uses: actions/upload-artifact@v4
