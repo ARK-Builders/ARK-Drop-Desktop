@@ -37,7 +37,7 @@ jobs:
         id: drop_version
         uses: dante-signal31/rust-app-version@v1.2.0
         with:
-          cargo_toml_folder: ./src-tauri
+          cargo_toml_folder: src-tauri/
 
       - name: Install Dependencies (Ubuntu only)
         if: matrix.settings.platform == 'ubuntu-22.04' # This must match the platform value defined above.
