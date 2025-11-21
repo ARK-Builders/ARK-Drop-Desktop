@@ -12,3 +12,6 @@ vite.config.ts.timestamp-*
 /src-tauri/.ark-drop-data-*
 target
 .vscode
+.idea
+*.lock
+package-lock.json
