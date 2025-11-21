@@ -93,14 +93,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ark-drop.deb
-          path: ./target/release/bundle/appimage/ARK Drop_${{ steps.drop_version.outputs.app_version }}_amd64.deb
+          path: ./target/release/bundle/deb/ARK Drop_${{ steps.drop_version.outputs.app_version }}_amd64.deb
 
       - name: Upload Linux RPM Binary
         if: matrix.settings.platform == 'ubuntu-22.04'
         uses: actions/upload-artifact@v4
         with:
           name: ark-drop.rpm
-          path: ./target/release/bundle/appimage/ARK Drop_${{ steps.drop_version.outputs.app_version }}_amd64.rpm
+          path: ./target/release/bundle/rpm/ARK Drop-${{ steps.drop_version.outputs.app_version }}-1.x86_64.rpm
 
       - name: Upload macOS Build (ark-drop.app)
         uses: actions/upload-artifact@v4
