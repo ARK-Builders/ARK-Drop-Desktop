@@ -33,6 +33,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Fetch App Version from Cargo.toml
+        if: matrix.settings.platform == 'ubuntu-22.04'
+        id: drop_version
+        run: |
+          export APP_VERSION=$(grep -E '^version\s*=' src-tauri/Cargo.toml | sed -E 's/version\s*=\s*"([^"]+)"/\1/')
+          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Install Dependencies (Ubuntu only)
         if: matrix.settings.platform == 'ubuntu-22.04' # This must match the platform value defined above.
         run: |
@@ -77,13 +84,9 @@ jobs:
       - name: Upload Linux AppImage
         if: matrix.settings.platform == 'ubuntu-22.04'
         uses: actions/upload-artifact@v4
-        env:
-          run: |
-            export APP_VERSION=$(grep -E '^version\s*=' src-tauri/Cargo.toml | sed -E 's/version\s*=\s*"([^"]+)"/\1/')
-            echo $APP_VERSION >> $GITHUB_ENV
         with:
           name: ark-drop.AppImage
-          path: ./target/release/bundle/appimage/ARK Drop_${{ env.APP_VERSION }}_amd64.AppImage
+          path: ./target/release/bundle/appimage/ARK Drop_${{ steps.drop_version.outputs.app_version }}_amd64.AppImage
 
       - name: Upload macOS Build (ark-drop.app)
         uses: actions/upload-artifact@v4
