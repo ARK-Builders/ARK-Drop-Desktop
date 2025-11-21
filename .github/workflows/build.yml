@@ -33,19 +33,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: install dependencies (ubuntu only)
+      - name: Get App Version from Cargo.toml
+        id: drop_version
+        uses: dante-signal31/rust-app-version@v1.2.0
+        with:
+          cargo_toml_folder: ./src-tauri
+
+      - name: Install Dependencies (Ubuntu only)
         if: matrix.settings.platform == 'ubuntu-22.04' # This must match the platform value defined above.
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: setup node
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
           cache: 'npm' # Set this to npm, yarn or pnpm.
 
-      - name: install Rust stable
+      - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
@@ -54,7 +61,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
-      - name: install frontend dependencies
+      - name: Install Frontend Dependencies
         # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
         run: npm install # change this to npm or pnpm depending on which one you use.
 
@@ -79,18 +86,18 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ark-drop.AppImage
-          path: ./target/release/bundle/appimage/ark-drop_*_amd64.AppImage
+          path: ./target/release/bundle/appimage/ark-drop_${{ steps.drop_version.outputs.app_version }}_amd64.AppImage
 
-      - name: Upload MacOS Build (ark-drop.app)
+      - name: Upload macOS Build (ark-drop.app)
         uses: actions/upload-artifact@v4
         if: matrix.settings.platform == 'macos-latest'
         with:
-          name: ark-drop-MacOS.zip
+          name: ark-drop-macOS.zip
           path: ./target/universal-apple-darwin/release/bundle/macos
 
-      - name: Upload MacOS Build (ark-drop.dmg)
+      - name: Upload macOS Build (ark-drop.dmg)
         uses: actions/upload-artifact@v4
         if: matrix.settings.platform == 'macos-latest'
         with:
-          name: ark-drop-MacOS-dmg.zip
+          name: ark-drop-macOS-dmg.zip
           path: ./target/universal-apple-darwin/release/bundle/dmg
