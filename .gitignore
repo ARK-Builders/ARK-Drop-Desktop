@@ -13,3 +13,5 @@ vite.config.ts.timestamp-*
 target
 .vscode
 .idea
+*.lock
+package-lock.json
