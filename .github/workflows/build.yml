@@ -33,6 +33,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Frontend Dependencies
+        # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
+        run: npm install # change this to npm or pnpm depending on which one you use.
+
       - name: Fetch App Version from Cargo.toml
         if: matrix.settings.platform == 'ubuntu-22.04'
         id: drop_version
@@ -61,10 +65,6 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
-      - name: Install Frontend Dependencies
-        # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
-        run: npm install # change this to npm or pnpm depending on which one you use.
-
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -86,14 +86,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ark-drop.AppImage
-          path: ./target/release/bundle/appimage/ARK Drop_${{ steps.drop_version.outputs.app_version }}_amd64.AppImage
-
-      - name: Upload Linux Debian Binary
-        if: matrix.settings.platform == 'ubuntu-22.04'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ark-drop.deb
-          path: ./target/release/bundle/deb/ARK Drop_${{ steps.drop_version.outputs.app_version }}_amd64.deb
+          path: ./target/release/bundle/appimage/ark-drop_*_amd64.AppImage
 
       - name: Upload Linux RPM Binary
         if: matrix.settings.platform == 'ubuntu-22.04'
