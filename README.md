@@ -5,7 +5,7 @@ ARK Drop is designed for easy file transfer. You can use QR codes to quickly sen
 > [!WARNING]
 > ARK Drop is currently under heavy development and should be used with caution. It has not undergone extensive testing and may contain bugs, vulnerabilities, or unexpected behavior.
 
-## Development
+## Tech Stack
 
 ARK Drop is built using [Tauri](https://tauri.app/) with [SvelteKit](https://kit.svelte.dev/).
 
@@ -17,70 +17,52 @@ ARK Drop is built using [Tauri](https://tauri.app/) with [SvelteKit](https://kit
 
 [SvelteKit](https://kit.svelte.dev/) is an application framework built on Svelte. Unlike traditional frameworks, SvelteKit shifts work to a compile step during the build process, resulting in code that directly updates the DOM when the application's state changes, enhancing performance.
 
-## Running ARK Drop Locally
+## Development
 
-You can use either `cargo tauri` CLI or `npm` CLI commands to run ARK Drop locally.
+### Prerequisites
 
-### Installing `cargo tauri`
+- [Rust](https://rustup.rs/)
+- [Node.js](https://nodejs.org/)
 
-To install `cargo tauri`, run:
+### Install Dependencies
 
 ```sh
-cargo install tauri-cli
+npm install
 ```
 
-### Starting the Tauri Development Window
-
-To start the Tauri development window, run:
+### Run Development Server
 
 ```sh
 npm run tauri dev
 ```
 
-or
-
-```sh
-cargo tauri dev
-```
-
 This command builds the Rust code and opens the webview to display your web app. You can make changes to your web app, and if your tooling supports it, the webview will update automatically, similar to a browser.
 
-## Building the Project
+## Build
 
-Tauri will detect your operating system and build a corresponding bundle. To build the project, run:
+Tauri will detect your operating system and build a corresponding bundle.
 
 ```sh
 npm run tauri build
 ```
 
-or
-
-```sh
-cargo tauri build
-```
-
 This process will build your frontend, compile the Rust binary, gather all external binaries and resources, and produce platform-specific bundles and installers.
 
-For more information about Tauri builds, refer to the [Tauri building guide](https://tauri.app/v1/guides/building/).
+For more information, refer to the [Tauri building guide](https://tauri.app/v1/guides/building/).
 
-## Dependencies
+## Android Build
 
-Cross compilation building is done easiest via cross library.
+Cross-compilation is easiest using [Cross](https://github.com/cross-rs/cross). Alternatively, you can set up the NDK and build manually.
 
-- [Cross](https://github.com/cross-rs/cross)
-
-Alternatively you can setup the NDK and build manually
-
-### Building for Android
-
-Make sure you have added the nessecary targets to build for android
+### Add Android Targets
 
 ```sh
-rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
 ```
 
-Build the cdylib for all the targets
+### Build for Android Targets
 
+Using Cross:
 ```sh
 cross build -p drop_core --target aarch64-linux-android
 cross build -p drop_core --target armv7-linux-androideabi
@@ -88,8 +70,8 @@ cross build -p drop_core --target i686-linux-android
 cross build -p drop_core --target x86_64-linux-android
 ```
 
-Generate the bindings using uniffi for kotlin
-
+Or using cargo-ndk:
 ```sh
-cargo run -p uniffi-bingen generate --library target/x86_64-linux-android/debug/libdrop_core.so --language=kotlin --out-dir ./bindings
+cargo install cargo-ndk
+cargo ndk -o ./target/release/jniLibs --target aarch64-linux-android --target armv7-linux-androideabi --target i686-linux-android --target x86_64-linux-android build -p drop_core --release
 ```
